@@ -4,10 +4,10 @@ const KEY  = () => (import.meta.env.VITE_RESEND_API_KEY as string) ?? '';
 
 export async function sendEmail(to: string, subject: string, html: string) {
   try {
-    await fetch(RESEND_API, {
+    await fetch('/api/send-email', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${KEY()}` },
-      body: JSON.stringify({ from: FROM, to, subject, html }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to, subject, html }),
     });
   } catch { /* never block user flow */ }
 }
