@@ -1,0 +1,67 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* ── Waves & Wires — Warm Cream + Golden Yellow ───── */
+    --background:          36 25% 96%;    /* warm cream #f7f5f0 */
+    --foreground:          24 15% 11%;    /* near-black warm   */
+
+    --card:                0  0% 100%;    /* white cards       */
+    --card-foreground:     24 15% 11%;
+
+    --popover:             0  0% 100%;
+    --popover-foreground:  24 15% 11%;
+
+    --primary:             43 96% 48%;    /* golden yellow #f5be0b */
+    --primary-foreground:  24 15% 8%;     /* dark text on yellow  */
+
+    --secondary:           40 30% 92%;    /* warm cream tint */
+    --secondary-foreground: 24 15% 20%;
+
+    --muted:               38 20% 90%;
+    --muted-foreground:    24 10% 48%;
+
+    --accent:              43 70% 88%;    /* soft gold */
+    --accent-foreground:   24 15% 12%;
+
+    --destructive:         0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success:             142 71% 40%;
+    --success-foreground:  0 0% 100%;
+
+    --border:              36 18% 86%;    /* warm light border */
+    --input:               36 18% 86%;
+    --ring:                43 96% 48%;
+
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+
+  body {
+    background-color: hsl(36 25% 96%);
+    color: hsl(24 15% 11%);
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,h2,h3,h4,h5,h6 { @apply font-bold tracking-tight; }
+}
+
+@layer utilities {
+  .text-balance { text-wrap: balance; }
+  .transition-fast { transition: all 150ms ease; }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar          { width: 5px; }
+::-webkit-scrollbar-track    { background: hsl(36 18% 92%); }
+::-webkit-scrollbar-thumb    { background: hsl(36 18% 76%); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: hsl(43 70% 65%); }
