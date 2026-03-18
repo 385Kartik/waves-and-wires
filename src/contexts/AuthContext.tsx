@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
+import { sendEmail, welcomeEmailHtml } from '@/lib/email';
 
 export interface AuthUser {
   id: string; email: string; full_name: string;
@@ -22,8 +23,8 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  const [user,      setUser]    = useState<AuthUser | null>(null);
+  const [session,   setSession] = useState<Session | null>(null);
   const [isLoading, setLoading] = useState(true);
 
   async function handleSession(sess: Session | null) {
@@ -31,13 +32,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSession(sess);
     const { data: profile } = await supabase.from('profiles').select('*').eq('id', sess.user.id).single();
     setUser({
-      id: sess.user.id, email: sess.user.email ?? '',
-      full_name: profile?.full_name ?? sess.user.user_metadata?.full_name ?? '',
-      phone: profile?.phone ?? undefined,
-      avatar_url: profile?.avatar_url ?? undefined,
+      id:             sess.user.id,
+      email:          sess.user.email ?? '',
+      full_name:      profile?.full_name ?? sess.user.user_metadata?.full_name ?? '',
+      phone:          profile?.phone ?? undefined,
+      avatar_url:     profile?.avatar_url ?? undefined,
       email_verified: sess.user.email_confirmed_at != null,
-      is_admin: profile?.is_admin ?? false,
-      created_at: sess.user.created_at,
+      is_admin:       profile?.is_admin ?? false,
+      created_at:     sess.user.created_at,
     });
     setLoading(false);
   }
@@ -67,6 +69,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     if (data.user && (!data.user.identities || data.user.identities.length === 0))
       return { success: false, error: 'account_exists' };
+
+    // Welcome email
+    sendEmail(email, 'Welcome to Waves & Wires! 🎉', welcomeEmailHtml(fullName));
+
     return { success: true };
   }
 
