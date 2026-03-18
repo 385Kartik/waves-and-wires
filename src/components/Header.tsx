@@ -34,28 +34,26 @@ export default function Header() {
   }
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 shadow-sm shadow-border/50">
+    <header className="sticky h-20 top-0 z-50 border-b border-border bg-black/95 backdrop-blur supports-[backdrop-filter]:bg-black/80 shadow-sm shadow-border/50">
       <div className="h-1 w-full bg-gradient-to-r from-yellow-400 via-amber-400 to-yellow-500" />
 
       <div className="container flex h-16 items-center justify-between gap-4">
         {/* Logo */}
-        <Link to="/" className="flex items-center gap-2.5 shrink-0">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary shadow-sm shadow-primary/30">
-            <span className="text-[11px] font-black text-primary-foreground leading-none">W&W</span>
-          </div>
-          <div className="hidden sm:block">
-            <span className="text-base font-black text-foreground tracking-tight">Waves</span>
-            <span className="text-base font-black text-primary tracking-tight"> & Wires</span>
-          </div>
-        </Link>
-
+        {/* Logo */}
+<Link to="/" className="flex items-center shrink-0">
+  <img
+    src="/logo-light-final.png"
+    alt="Waves & Wires"
+    className="h-14 w-auto object-contain"
+  />
+</Link>
         {/* Desktop Nav */}
         <nav className="hidden items-center gap-0.5 md:flex">
           {navLinks.map(link => {
             const active = location.pathname === link.path;
             return (
               <Link key={link.path} to={link.path}
-                className={`relative rounded-lg px-3.5 py-2 text-sm font-semibold transition-all ${
+                className={`relative rounded-lg px-3.5 py-2 text-sm font-semibold transition-all  ${
                   active ? 'text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
                 }`}>
                 {link.label}

@@ -14,33 +14,38 @@ export default function ContactPage() {
   const inputCls = "w-full rounded-xl border border-border bg-secondary/60 px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 transition-all";
 
   async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setSending(true);
-    try {
-      const clean = (s: string) => s.replace(/[<>]/g, '').trim().slice(0, 2000);
-      const sanitized = {
-        name:    clean(form.name),
-        email:   form.email.trim().toLowerCase(),
-        subject: clean(form.subject),
-        message: clean(form.message),
-      };
+  e.preventDefault();
+  setSending(true);
+  try {
+    const clean = (s: string) => s.replace(/[<>]/g, '').trim().slice(0, 2000);
+    const sanitized = {
+      name:    clean(form.name),
+      email:   form.email.trim().toLowerCase(),
+      subject: clean(form.subject),
+      message: clean(form.message),
+    };
 
-      const { error: dbErr } = await supabase.from('contact_messages').insert(sanitized);
-      if (dbErr) throw dbErr;
+    const { error: dbErr } = await supabase.from('contact_messages').insert(sanitized);
+    if (dbErr) throw dbErr;
 
-      await sendEmail(
-        settings.store_email,
-        `[Contact Form] ${sanitized.subject}`,
-        contactAdminHtml(sanitized.name, sanitized.email, sanitized.subject, sanitized.message)
-      );
+    // Direct fetch instead of sendEmail wrapper
+    await fetch('/api/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to:      settings.store_email,
+        subject: `[Contact Form] ${sanitized.subject}`,
+        html:    contactAdminHtml(sanitized.name, sanitized.email, sanitized.subject, sanitized.message),
+      }),
+    });
 
-      setSent(true);
-      setForm({ name: '', email: '', subject: '', message: '' });
-      toast.success("Message sent! We'll reply within 24 hours.");
-    } catch (err: any) {
-      toast.error(err.message ?? 'Failed to send. Please try again.');
-    } finally { setSending(false); }
-  }
+    setSent(true);
+    setForm({ name: '', email: '', subject: '', message: '' });
+    toast.success("Message sent! We'll reply within 24 hours.");
+  } catch (err: any) {
+    toast.error(err.message ?? 'Failed to send. Please try again.');
+  } finally { setSending(false); }
+}
 
   return (
     <div className="container py-8 sm:py-12">
@@ -84,6 +89,20 @@ export default function ContactPage() {
                 <div className="flex justify-between"><span>Mon – Sat</span><span className="font-semibold text-foreground">9 AM – 7 PM</span></div>
                 <div className="flex justify-between"><span>Sunday</span><span className="font-semibold">Closed</span></div>
               </div>
+            </div>
+
+            {/* Google Maps */}
+            <div className="rounded-2xl border border-border overflow-hidden">
+              <iframe
+                title="Waves & Wires Location"
+                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3766.8!2d72.8617!3d19.3015!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2sJesal+Park%2C+Bhayandar+East%2C+Mira+Bhayandar%2C+Maharashtra+401105!5e0!3m2!1sen!2sin!4v1"
+                width="100%"
+                height="200"
+                style={{ border: 0, display: 'block' }}
+                allowFullScreen
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+              />
             </div>
           </div>
 

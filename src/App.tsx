@@ -21,6 +21,10 @@ import ReturnPolicyPage from "@/pages/ReturnPolicyPage";
 import ShippingInfoPage from "@/pages/ShippingInfoPage";
 import FAQPage from "@/pages/FAQPage";
 import NotFound from "@/pages/NotFound";
+import AboutPage from '@/pages/AboutPage';
+import BlogPage from '@/pages/BlogPage';
+import CareersPage from '@/pages/CareersPage';
+import ScrollToTop from '@/components/ScrollToTop';
 
 const queryClient = new QueryClient();
 
@@ -32,6 +36,7 @@ const App = () => (
           <WishlistProvider>
             <Sonner />
             <BrowserRouter>
+            <ScrollToTop />
               <Routes>
                 <Route element={<Layout />}>
                   <Route path="/" element={<HomePage />} />
@@ -49,6 +54,9 @@ const App = () => (
                   <Route path="/return-policy" element={<ReturnPolicyPage />} />
                   <Route path="/shipping-info" element={<ShippingInfoPage />} />
                   <Route path="/faq" element={<FAQPage />} />
+                  <Route path="/about" element={<AboutPage />} />
+                  <Route path="/blog" element={<BlogPage />} />
+                  <Route path="/careers" element={<CareersPage />} />
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>

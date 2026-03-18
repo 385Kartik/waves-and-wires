@@ -29,8 +29,8 @@ export default function Footer() {
             <div className="flex gap-2.5">
               {[
                 { Icon: Instagram, href: 'https://instagram.com' },
-                { Icon: Twitter,   href: 'https://twitter.com'   },
-                { Icon: Youtube,   href: 'https://youtube.com'   },
+                { Icon: Twitter, href: 'https://twitter.com' },
+                { Icon: Youtube, href: 'https://youtube.com' },
               ].map(({ Icon, href }) => (
                 <a key={href} href={href} target="_blank" rel="noopener noreferrer"
                   className="flex h-9 w-9 items-center justify-center rounded-xl bg-secondary text-muted-foreground hover:bg-primary hover:text-primary-foreground transition-all">
@@ -65,11 +65,11 @@ export default function Footer() {
             <h3 className="text-xs font-bold text-foreground uppercase tracking-wider mb-4">Policies</h3>
             <ul className="space-y-2.5">
               {[
-                ['Privacy Policy',   '/privacy-policy'],
+                ['Privacy Policy', '/privacy-policy'],
                 ['Terms of Service', '/terms-of-service'],
-                ['Return Policy',    '/return-policy'],
-                ['Shipping Info',    '/shipping-info'],
-                ['FAQ',              '/faq'],
+                ['Return Policy', '/return-policy'],
+                ['Shipping Info', '/shipping-info'],
+                ['FAQ', '/faq'],
               ].map(([label, path]) => (
                 <li key={path}>
                   <Link to={path} className="text-sm text-muted-foreground hover:text-primary transition-colors font-medium">
@@ -124,9 +124,12 @@ export default function Footer() {
             © {new Date().getFullYear()} {settings.store_name}. All rights reserved.
           </p>
           <div className="flex items-center gap-4">
-            <Link to="/privacy-policy"   className="text-xs text-muted-foreground hover:text-primary transition-colors">Privacy</Link>
+            <Link to="/privacy-policy" className="text-xs text-muted-foreground hover:text-primary transition-colors">Privacy</Link>
             <Link to="/terms-of-service" className="text-xs text-muted-foreground hover:text-primary transition-colors">Terms</Link>
-            <Link to="/return-policy"    className="text-xs text-muted-foreground hover:text-primary transition-colors">Returns</Link>
+            <Link to="/return-policy" className="text-xs text-muted-foreground hover:text-primary transition-colors">Returns</Link>
+            <Link to="/about" className="text-xs text-muted-foreground hover:text-primary transition-colors">About Us</Link>
+            <Link to="/blog" className="text-xs text-muted-foreground hover:text-primary transition-colors">Blog</Link>
+            <Link to="/careers" className="text-xs text-muted-foreground hover:text-primary transition-colors">Careers</Link>
           </div>
         </div>
       </div>
