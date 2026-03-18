@@ -8,12 +8,11 @@ import { format } from 'date-fns';
 
 interface Order {
   id: string; order_number: string; status: string;
-  payment_status: string; total: number; subtotal: number;
+  payment_status: string; payment_method: string; total: number; subtotal: number;
   shipping: number; discount: number; tax: number;
   created_at: string; tracking_number: string | null;
   shipping_address: any;
   order_items: Array<{ id: string; product_name: string; product_image: string; quantity: number; price: number; total: number }>;
-  // refund_request status fetched separately
   refund_status?: string | null;
 }
 
@@ -22,18 +21,29 @@ const TIMELINE_LABELS: Record<string,string> = { pending:'Order Placed', confirm
 const TIMELINE_ICONS: Record<string,any> = { pending:Clock, confirmed:CheckCircle, processing:Package, shipped:Truck, delivered:CheckCircle };
 const INR = (n: number) => `₹${n.toLocaleString('en-IN')}`;
 
+const CANCEL_REASONS = [
+  'Ordered by mistake',
+  'Found a better price elsewhere',
+  'Delivery time is too long',
+  'Changed my mind',
+  'Duplicate order',
+  'Other',
+];
+
 export default function OrderTrackingPage() {
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
-  const [query,       setQuery]       = useState(searchParams.get('order') ?? '');
-  const [order,       setOrder]       = useState<Order | null>(null);
-  const [myOrders,    setMyOrders]    = useState<Order[]>([]);
-  const [loading,     setLoading]     = useState(false);
-  const [searched,    setSearched]    = useState(false);
-  const [tab,         setTab]         = useState<'track'|'myorders'>('track');
-  const [cancelModal, setCancelModal] = useState<Order | null>(null);
-  const [refundModal, setRefundModal] = useState<Order | null>(null);
-  const [refundReason, setRefundReason] = useState('');
+  const [query,         setQuery]         = useState(searchParams.get('order') ?? '');
+  const [order,         setOrder]         = useState<Order | null>(null);
+  const [myOrders,      setMyOrders]      = useState<Order[]>([]);
+  const [loading,       setLoading]       = useState(false);
+  const [searched,      setSearched]      = useState(false);
+  const [tab,           setTab]           = useState<'track'|'myorders'>('track');
+  const [cancelModal,   setCancelModal]   = useState<Order | null>(null);
+  const [cancelReason,  setCancelReason]  = useState('');
+  const [cancelOther,   setCancelOther]   = useState('');
+  const [refundModal,   setRefundModal]   = useState<Order | null>(null);
+  const [refundReason,  setRefundReason]  = useState('');
   const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
@@ -41,14 +51,11 @@ export default function OrderTrackingPage() {
     if (searchParams.get('tab') === 'myorders') setTab('myorders');
   }, []);
 
-  // Enrich orders with refund_request status
   async function enrichWithRefundStatus(orders: any[]): Promise<Order[]> {
     if (!orders.length) return orders;
     const ids = orders.map(o => o.id);
     const { data: refunds } = await supabase
-      .from('refund_requests')
-      .select('order_id, status')
-      .in('order_id', ids);
+      .from('refund_requests').select('order_id, status').in('order_id', ids);
     const refundMap: Record<string, string> = {};
     (refunds ?? []).forEach((r: any) => { refundMap[r.order_id] = r.status; });
     return orders.map(o => ({ ...o, refund_status: refundMap[o.id] ?? null }));
@@ -83,14 +90,33 @@ export default function OrderTrackingPage() {
   }
 
   async function cancelOrder(o: Order) {
+    const reason = cancelReason === 'Other' ? cancelOther.trim() : cancelReason;
+    if (!reason) { toast.error('Please select a reason'); return; }
+
     setActionLoading(true);
     try {
-      const { data, error } = await supabase.rpc('cancel_order', { p_order_id: o.id });
+      const { data, error } = await supabase.rpc('cancel_order', {
+        p_order_id: o.id,
+        p_reason:   reason,
+      });
       if (error) throw error;
-      const result = data as { success: boolean; error?: string };
+      const result = data as { success: boolean; error?: string; needs_refund?: boolean; payment_ref?: string; total?: number };
       if (!result.success) { toast.error(result.error ?? 'Could not cancel order'); return; }
-      toast.success('Order cancelled successfully. Stock has been restored.');
-      setCancelModal(null);
+
+      // Online payment — notify admin
+      if (result.needs_refund) {
+        await supabase.from('contact_messages').insert({
+          name:    o.shipping_address?.full_name ?? 'Customer',
+          email:   'system@internal.com',
+          subject: `[REFUND NEEDED] Order ${o.order_number} cancelled`,
+          message: `Order ${o.order_number} cancelled by customer.\nReason: ${reason}\nPayment Ref: ${result.payment_ref ?? 'N/A'}\nAmount: ₹${result.total?.toLocaleString('en-IN')}\n\nPlease process Razorpay refund manually.`,
+        });
+        toast.success('Order cancelled. Refund will be processed within 5–7 business days.');
+      } else {
+        toast.success('Order cancelled successfully.');
+      }
+
+      setCancelModal(null); setCancelReason(''); setCancelOther('');
       await loadMyOrders();
       if (order?.id === o.id) setOrder(prev => prev ? { ...prev, status: 'cancelled' } : prev);
     } catch (err: any) { toast.error(err.message ?? 'Failed to cancel order'); }
@@ -121,13 +147,11 @@ export default function OrderTrackingPage() {
 
   function refundBadge(o: Order) {
     if (!o.refund_status) return null;
-    const map: Record<string, string> = {
-      pending:   'bg-amber-100 text-amber-700',
-      approved:  'bg-blue-100 text-blue-700',
-      completed: 'bg-green-100 text-green-700',
-      rejected:  'bg-red-100 text-red-700',
+    const map: Record<string,string> = {
+      pending: 'bg-amber-100 text-amber-700', approved: 'bg-blue-100 text-blue-700',
+      completed: 'bg-green-100 text-green-700', rejected: 'bg-red-100 text-red-700',
     };
-    const labels: Record<string, string> = {
+    const labels: Record<string,string> = {
       pending: 'Refund Requested', approved: 'Refund Approved',
       completed: 'Refunded', rejected: 'Refund Rejected',
     };
@@ -193,7 +217,7 @@ export default function OrderTrackingPage() {
         {user && (
           <div className="flex flex-wrap gap-2 pt-1">
             {canCancel(o) && (
-              <button onClick={() => setCancelModal(o)}
+              <button onClick={() => { setCancelModal(o); setCancelReason(''); setCancelOther(''); }}
                 className="flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-100 transition-all">
                 <XCircle className="h-3.5 w-3.5" />Cancel Order
               </button>
@@ -339,7 +363,7 @@ export default function OrderTrackingPage() {
                 {user && (
                   <div className="flex flex-wrap gap-2">
                     {canCancel(order) && (
-                      <button onClick={() => setCancelModal(order)}
+                      <button onClick={() => { setCancelModal(order); setCancelReason(''); setCancelOther(''); }}
                         className="flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-100 transition-all">
                         <XCircle className="h-4 w-4" />Cancel Order
                       </button>
@@ -375,25 +399,61 @@ export default function OrderTrackingPage() {
       {/* CANCEL MODAL */}
       {cancelModal && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-2xl bg-card border border-border p-6 shadow-2xl space-y-4">
+          <div className="w-full max-w-sm rounded-2xl bg-card border border-border p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
                 <AlertTriangle className="h-5 w-5 text-red-600" />
               </div>
               <div>
-                <h3 className="font-bold text-foreground">Cancel Order?</h3>
-                <p className="text-xs text-muted-foreground">#{cancelModal.order_number}</p>
+                <h3 className="font-bold text-foreground">Why are you cancelling?</h3>
+                <p className="text-xs text-muted-foreground">#{cancelModal.order_number} · {INR(cancelModal.total)}</p>
               </div>
             </div>
-            <p className="text-sm text-muted-foreground">This cannot be undone. Stock will be restored and coupon usage reversed.</p>
+
+            <div className="space-y-2">
+              {CANCEL_REASONS.map(reason => (
+                <label key={reason}
+                  className={`flex items-center gap-3 rounded-xl border px-4 py-2.5 cursor-pointer transition-all ${
+                    cancelReason === reason ? 'border-red-300 bg-red-50' : 'border-border hover:border-red-200 hover:bg-red-50/50'
+                  }`}>
+                  <div className={`h-4 w-4 rounded-full border-2 shrink-0 flex items-center justify-center transition-all ${
+                    cancelReason === reason ? 'border-red-500' : 'border-muted-foreground/40'
+                  }`}>
+                    {cancelReason === reason && <div className="h-2 w-2 rounded-full bg-red-500" />}
+                  </div>
+                  <input type="radio" className="hidden" name="cancel_reason"
+                    onChange={() => { setCancelReason(reason); setCancelOther(''); }} />
+                  <span className="text-sm text-foreground">{reason}</span>
+                </label>
+              ))}
+
+              {cancelReason === 'Other' && (
+                <textarea
+                  value={cancelOther}
+                  onChange={e => setCancelOther(e.target.value)}
+                  rows={2} maxLength={200}
+                  placeholder="Please tell us more…"
+                  className="w-full rounded-xl border border-border bg-secondary/60 px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100 transition-all resize-none"
+                />
+              )}
+            </div>
+
+            {cancelModal.payment_method === 'razorpay' && cancelModal.payment_status === 'paid' && (
+              <div className="rounded-xl bg-blue-50 border border-blue-200 p-3 text-xs text-blue-700">
+                💳 Since you paid online, your refund of <strong>{INR(cancelModal.total)}</strong> will be processed within 5–7 business days.
+              </div>
+            )}
+
             <div className="flex gap-3">
-              <button onClick={() => setCancelModal(null)} disabled={actionLoading}
+              <button onClick={() => { setCancelModal(null); setCancelReason(''); setCancelOther(''); }}
+                disabled={actionLoading}
                 className="flex-1 rounded-xl border border-border py-2.5 text-sm font-semibold text-muted-foreground hover:bg-secondary transition-all">
                 Keep Order
               </button>
-              <button onClick={() => cancelOrder(cancelModal)} disabled={actionLoading}
-                className="flex-1 rounded-xl bg-red-600 py-2.5 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50 transition-all">
-                {actionLoading ? 'Cancelling…' : 'Yes, Cancel'}
+              <button onClick={() => cancelOrder(cancelModal)}
+                disabled={actionLoading || !cancelReason || (cancelReason === 'Other' && !cancelOther.trim())}
+                className="flex-1 rounded-xl bg-red-600 py-2.5 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-40 transition-all">
+                {actionLoading ? 'Cancelling…' : 'Cancel Order'}
               </button>
             </div>
           </div>
