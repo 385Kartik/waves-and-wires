@@ -56,7 +56,7 @@ export default function OrderTrackingPage() {
     const ids = orders.map(o => o.id);
     const { data: refunds } = await supabase
       .from('refund_requests').select('order_id, status').in('order_id', ids);
-    const refundMap: Record<string, string> = {};
+    const refundMap: Record<string,string> = {};
     (refunds ?? []).forEach((r: any) => { refundMap[r.order_id] = r.status; });
     return orders.map(o => ({ ...o, refund_status: refundMap[o.id] ?? null }));
   }
@@ -100,27 +100,62 @@ export default function OrderTrackingPage() {
         p_reason:   reason,
       });
       if (error) throw error;
-      const result = data as { success: boolean; error?: string; needs_refund?: boolean; payment_ref?: string; total?: number };
+
+      const result = data as {
+        success: boolean; error?: string;
+        needs_refund?: boolean; payment_ref?: string; total?: number;
+      };
       if (!result.success) { toast.error(result.error ?? 'Could not cancel order'); return; }
 
-      // Online payment — notify admin
-      if (result.needs_refund) {
-        await supabase.from('contact_messages').insert({
-          name:    o.shipping_address?.full_name ?? 'Customer',
-          email:   'system@internal.com',
-          subject: `[REFUND NEEDED] Order ${o.order_number} cancelled`,
-          message: `Order ${o.order_number} cancelled by customer.\nReason: ${reason}\nPayment Ref: ${result.payment_ref ?? 'N/A'}\nAmount: ₹${result.total?.toLocaleString('en-IN')}\n\nPlease process Razorpay refund manually.`,
-        });
-        toast.success('Order cancelled. Refund will be processed within 5–7 business days.');
+      if (result.needs_refund && result.payment_ref) {
+        // Auto refund via Netlify function
+        try {
+          const refundRes = await fetch('/api/razorpay-refund', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              payment_id: result.payment_ref,
+              amount:     result.total,
+            }),
+          });
+          const refundData = await refundRes.json();
+
+          if (refundData.success) {
+            await supabase.from('orders')
+              .update({ payment_status: 'refunded', updated_at: new Date().toISOString() })
+              .eq('id', o.id);
+            toast.success('Order cancelled. Refund initiated — reaches your account in 5–7 business days.');
+          } else {
+            // Auto refund failed — notify admin
+            await supabase.from('contact_messages').insert({
+              name:    o.shipping_address?.full_name ?? 'Customer',
+              email:   'system@internal.com',
+              subject: `[REFUND FAILED] Order ${o.order_number}`,
+              message: `Auto refund failed for order ${o.order_number}.\nError: ${refundData.error}\nPayment Ref: ${result.payment_ref}\nAmount: ₹${result.total?.toLocaleString('en-IN')}\n\nPlease process manually on Razorpay Dashboard.`,
+            });
+            toast.success('Order cancelled. Refund will be processed manually within 2 business days.');
+          }
+        } catch {
+          // Network error — notify admin
+          await supabase.from('contact_messages').insert({
+            name:    o.shipping_address?.full_name ?? 'Customer',
+            email:   'system@internal.com',
+            subject: `[REFUND NEEDED] Order ${o.order_number}`,
+            message: `Order ${o.order_number} cancelled. Refund function failed.\nPayment Ref: ${result.payment_ref}\nAmount: ₹${result.total?.toLocaleString('en-IN')}\nCancellation Reason: ${reason}\n\nPlease process refund manually.`,
+          });
+          toast.success('Order cancelled. Refund will be processed within 5–7 business days.');
+        }
       } else {
+        // COD — no refund needed
         toast.success('Order cancelled successfully.');
       }
 
       setCancelModal(null); setCancelReason(''); setCancelOther('');
       await loadMyOrders();
       if (order?.id === o.id) setOrder(prev => prev ? { ...prev, status: 'cancelled' } : prev);
-    } catch (err: any) { toast.error(err.message ?? 'Failed to cancel order'); }
-    finally { setActionLoading(false); }
+    } catch (err: any) {
+      toast.error(err.message ?? 'Failed to cancel order');
+    } finally { setActionLoading(false); }
   }
 
   async function requestRefund(o: Order) {
@@ -138,8 +173,9 @@ export default function OrderTrackingPage() {
       toast.success('Refund request submitted! We\'ll review it within 2–3 business days.');
       setRefundModal(null); setRefundReason('');
       await loadMyOrders();
-    } catch (err: any) { toast.error(err.message ?? 'Failed to submit refund request'); }
-    finally { setActionLoading(false); }
+    } catch (err: any) {
+      toast.error(err.message ?? 'Failed to submit refund request');
+    } finally { setActionLoading(false); }
   }
 
   const canCancel = (o: Order) => ['pending', 'confirmed'].includes(o.status);
@@ -148,8 +184,10 @@ export default function OrderTrackingPage() {
   function refundBadge(o: Order) {
     if (!o.refund_status) return null;
     const map: Record<string,string> = {
-      pending: 'bg-amber-100 text-amber-700', approved: 'bg-blue-100 text-blue-700',
-      completed: 'bg-green-100 text-green-700', rejected: 'bg-red-100 text-red-700',
+      pending:   'bg-amber-100 text-amber-700',
+      approved:  'bg-blue-100 text-blue-700',
+      completed: 'bg-green-100 text-green-700',
+      rejected:  'bg-red-100 text-red-700',
     };
     const labels: Record<string,string> = {
       pending: 'Refund Requested', approved: 'Refund Approved',
@@ -176,9 +214,9 @@ export default function OrderTrackingPage() {
           <div className="flex flex-col items-end gap-1.5">
             <p className="font-bold text-foreground text-sm">{INR(o.total)}</p>
             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize ${
-              o.status === 'delivered' ? 'bg-green-100 text-green-700'
-              : o.status === 'cancelled' ? 'bg-red-100 text-red-700'
-              : 'bg-amber-100 text-amber-700'
+              o.status === 'delivered'  ? 'bg-green-100 text-green-700' :
+              o.status === 'cancelled'  ? 'bg-red-100 text-red-700' :
+              'bg-amber-100 text-amber-700'
             }`}>{o.status}</span>
             {refundBadge(o)}
           </div>
@@ -211,7 +249,9 @@ export default function OrderTrackingPage() {
         )}
 
         {o.tracking_number && (
-          <p className="text-xs text-muted-foreground">Tracking: <span className="font-mono font-semibold text-foreground">{o.tracking_number}</span></p>
+          <p className="text-xs text-muted-foreground">
+            Tracking: <span className="font-mono font-semibold text-foreground">{o.tracking_number}</span>
+          </p>
         )}
 
         {user && (
@@ -257,6 +297,7 @@ export default function OrderTrackingPage() {
         </div>
       )}
 
+      {/* TRACK TAB */}
       {tab === 'track' && (
         <div className="space-y-5">
           <div className="flex gap-2.5">
@@ -291,9 +332,9 @@ export default function OrderTrackingPage() {
                   </div>
                   <div className="flex flex-col items-end gap-1.5">
                     <span className={`text-xs font-bold px-3 py-1 rounded-full capitalize ${
-                      order.status === 'delivered' ? 'bg-green-100 text-green-700'
-                      : order.status === 'cancelled' ? 'bg-red-100 text-red-700'
-                      : 'bg-amber-100 text-amber-700'
+                      order.status === 'delivered' ? 'bg-green-100 text-green-700' :
+                      order.status === 'cancelled' ? 'bg-red-100 text-red-700' :
+                      'bg-amber-100 text-amber-700'
                     }`}>{order.status}</span>
                     {refundBadge(order)}
                   </div>
@@ -382,6 +423,7 @@ export default function OrderTrackingPage() {
         </div>
       )}
 
+      {/* MY ORDERS TAB */}
       {tab === 'myorders' && user && (
         <div className="space-y-3 sm:space-y-4">
           {myOrders.length === 0 ? (
@@ -440,7 +482,7 @@ export default function OrderTrackingPage() {
 
             {cancelModal.payment_method === 'razorpay' && cancelModal.payment_status === 'paid' && (
               <div className="rounded-xl bg-blue-50 border border-blue-200 p-3 text-xs text-blue-700">
-                💳 Since you paid online, your refund of <strong>{INR(cancelModal.total)}</strong> will be processed within 5–7 business days.
+                💳 Since you paid online, your refund of <strong>{INR(cancelModal.total)}</strong> will be automatically initiated and reaches your account in 5–7 business days.
               </div>
             )}
 
