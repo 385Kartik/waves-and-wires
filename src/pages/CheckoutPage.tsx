@@ -210,54 +210,87 @@ export default function CheckoutPage() {
 
   /* ─── Razorpay ───────────────────────── */
   async function placeRazorpay() {
-    if (!user) { toast.error('Sign in first'); navigate('/auth'); return; }
-    setPlacing(true);
+  if (!user) { toast.error('Sign in first'); navigate('/auth'); return; }
+  setPlacing(true);
 
+  try {
     const loaded = await new Promise<boolean>(resolve => {
       if (window.Razorpay) { resolve(true); return; }
       const s = document.createElement('script');
-      s.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      s.src     = 'https://checkout.razorpay.com/v1/checkout.js';
       s.onload  = () => resolve(true);
       s.onerror = () => resolve(false);
       document.head.appendChild(s);
     });
 
-    if (!loaded) { toast.error('Could not load Razorpay.'); setPlacing(false); return; }
+    if (!loaded) {
+      toast.error('Could not load Razorpay. Check your internet connection.');
+      setPlacing(false); return;
+    }
 
     const keyId = import.meta.env.VITE_RAZORPAY_KEY_ID;
-    if (!keyId) { toast.error('Razorpay key not configured.'); setPlacing(false); return; }
+    if (!keyId) {
+      toast.error('Razorpay key not configured.');
+      setPlacing(false); return;
+    }
 
-    const options = {
-      key: keyId, amount: total * 100, currency: 'INR',
-      name: 'Waves & Wires',
-      description: `Order — ${items.length} item${items.length > 1 ? 's' : ''}`,
-      prefill: { name: address.full_name, contact: address.phone, email: user.email },
-      theme: { color: '#f5c018' },
-      handler: async (response: { razorpay_payment_id: string }) => {
-        try {
-          const orderNum = await saveOrder('razorpay', 'paid', response.razorpay_payment_id);
-          clearCart();
-          toast.success('Payment successful! Order confirmed.');
-          sendEmail(
-            user.email,
-            `Payment Confirmed — ${orderNum}`,
-            orderConfirmHtml({ name: address.full_name, orderNum, items, subtotal, discount, shipping, tax, total, paymentMethod: 'razorpay' })
-          );
-          navigate(`/order-tracking?order=${orderNum}`);
-        } catch (err: any) {
-          toast.error('Payment done but order save failed. Contact support with payment ID: ' + response.razorpay_payment_id);
-        } finally { setPlacing(false); }
-      },
-      modal: { ondismiss: () => { setPlacing(false); toast.info('Payment cancelled'); } },
-    };
+    await new Promise<void>((resolve, reject) => {
+      const options = {
+        key:         keyId,
+        amount:      total * 100,
+        currency:    'INR',
+        name:        'Waves & Wires',
+        description: `Order — ${items.length} item${items.length > 1 ? 's' : ''}`,
+        prefill: {
+          name:    address.full_name,
+          contact: address.phone,
+          email:   user.email,
+        },
+        theme: { color: '#f5c018' },
+        handler: async (response: { razorpay_payment_id: string }) => {
+          try {
+            const orderNum = await saveOrder('razorpay', 'paid', response.razorpay_payment_id);
+            clearCart();
+            toast.success('Payment successful! Order confirmed.');
+            sendEmail(
+              user.email,
+              `Payment Confirmed — ${orderNum}`,
+              orderConfirmHtml({ name: address.full_name, orderNum, items, subtotal, discount, shipping, tax, total, paymentMethod: 'razorpay' })
+            );
+            navigate(`/order-tracking?order=${orderNum}`);
+            resolve();
+          } catch (err: any) {
+            toast.error('Payment done but order save failed. Contact support with payment ID: ' + response.razorpay_payment_id);
+            reject(err);
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            toast.info('Payment cancelled');
+            resolve();
+          },
+        },
+      };
 
-    const rzp = new window.Razorpay(options);
-    rzp.on('payment.failed', (r: any) => {
-      toast.error('Payment failed: ' + (r.error?.description ?? 'Unknown error'));
-      setPlacing(false);
+      try {
+        const rzp = new window.Razorpay(options);
+        rzp.on('payment.failed', (r: any) => {
+          toast.error('Payment failed: ' + (r.error?.description ?? 'Unknown error'));
+          resolve();
+        });
+        rzp.open();
+      } catch (err: any) {
+        toast.error('Failed to open Razorpay: ' + (err.message ?? 'Unknown error'));
+        resolve();
+      }
     });
-    rzp.open();
+
+  } catch {
+    // already handled above
+  } finally {
+    setPlacing(false);
   }
+}
 
   if (items.length === 0) {
     return (
