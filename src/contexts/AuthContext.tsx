@@ -23,8 +23,8 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user,      setUser]    = useState<AuthUser | null>(null);
-  const [session,   setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setLoading] = useState(true);
 
   async function handleSession(sess: Session | null) {
@@ -32,14 +32,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSession(sess);
     const { data: profile } = await supabase.from('profiles').select('*').eq('id', sess.user.id).single();
     setUser({
-      id:             sess.user.id,
-      email:          sess.user.email ?? '',
-      full_name:      profile?.full_name ?? sess.user.user_metadata?.full_name ?? '',
-      phone:          profile?.phone ?? undefined,
-      avatar_url:     profile?.avatar_url ?? undefined,
+      id: sess.user.id,
+      email: sess.user.email ?? '',
+      full_name: profile?.full_name ?? sess.user.user_metadata?.full_name ?? '',
+      phone: profile?.phone ?? undefined,
+      avatar_url: profile?.avatar_url ?? undefined,
       email_verified: sess.user.email_confirmed_at != null,
-      is_admin:       profile?.is_admin ?? false,
-      created_at:     sess.user.created_at,
+      is_admin: profile?.is_admin ?? false,
+      created_at: sess.user.created_at,
     });
     setLoading(false);
   }
@@ -82,7 +82,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return true;
   }
 
-  async function signOut() { await supabase.auth.signOut(); }
+  async function signOut() {
+    await supabase.auth.signOut({ scope: 'global' });
+  }
 
   async function resetPassword(email: string) {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
