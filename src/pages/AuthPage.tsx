@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Eye, EyeOff, Mail, Lock, User, ArrowRight, CheckCircle2, XCircle, AlertCircle, ShieldCheck } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, ArrowRight, CheckCircle2, XCircle, AlertCircle, ShieldCheck, KeyRound } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 
-type Mode = 'signin' | 'signup' | 'forgot' | 'verify';
+type Mode = 'signin' | 'signup' | 'forgot' | 'verify' | 'reset' | 'otp';
 
 const PW_RULES = [
   { label: 'At least 8 characters',     test: (p: string) => p.length >= 8 },
@@ -16,9 +17,9 @@ const PW_RULES = [
 function PasswordStrength({ password }: { password: string }) {
   if (!password) return null;
   const passed = PW_RULES.filter(r => r.test(password)).length;
-  const pct = (passed / PW_RULES.length) * 100;
-  const color = pct <= 40 ? 'bg-red-500' : pct <= 70 ? 'bg-amber-400' : 'bg-green-500';
-  const label = pct <= 40 ? 'Weak' : pct <= 70 ? 'Fair' : pct < 100 ? 'Good' : 'Strong';
+  const pct    = (passed / PW_RULES.length) * 100;
+  const color  = pct <= 40 ? 'bg-red-500' : pct <= 70 ? 'bg-amber-400' : 'bg-green-500';
+  const label  = pct <= 40 ? 'Weak' : pct <= 70 ? 'Fair' : pct < 100 ? 'Good' : 'Strong';
   return (
     <div className="mt-2 space-y-1.5">
       <div className="flex items-center gap-2">
@@ -41,85 +42,166 @@ function PasswordStrength({ password }: { password: string }) {
 }
 
 const inputCls = "w-full rounded-xl border border-border bg-secondary/60 py-2.5 pl-10 pr-10 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all";
+const inputNoPl = "w-full rounded-xl border border-border bg-secondary/60 py-2.5 px-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all";
 
 export default function AuthPage() {
   const { signIn, signUp, resetPassword, user, isLoading } = useAuth();
-  const navigate = useNavigate();
+  const navigate       = useNavigate();
   const [searchParams] = useSearchParams();
 
-  const [mode, setMode] = useState<Mode>('signin');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirm, setConfirm] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [showPw, setShowPw] = useState(false);
-  const [showCon, setShowCon] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const [info, setInfo] = useState('');
-  const [forgotSent, setForgotSent] = useState(false);
+  const [mode,        setMode]        = useState<Mode>('signin');
+  const [email,       setEmail]       = useState('');
+  const [password,    setPassword]    = useState('');
+  const [confirm,     setConfirm]     = useState('');
+  const [fullName,    setFullName]    = useState('');
+  const [showPw,      setShowPw]      = useState(false);
+  const [showCon,     setShowCon]     = useState(false);
+  const [busy,        setBusy]        = useState(false);
+  const [error,       setError]       = useState('');
+  const [info,        setInfo]        = useState('');
+  const [forgotSent,  setForgotSent]  = useState(false);
+
+  // Reset password
+  const [newPassword, setNewPassword] = useState('');
+  const [newConfirm,  setNewConfirm]  = useState('');
+  const [showNew,     setShowNew]     = useState(false);
+  const [showNewCon,  setShowNewCon]  = useState(false);
+  const [resetDone,   setResetDone]   = useState(false);
+
+  // OTP login
+  const [otpEmail,    setOtpEmail]    = useState('');
+  const [otpSent,     setOtpSent]     = useState(false);
+  const [otpCode,     setOtpCode]     = useState('');
 
   useEffect(() => {
-    if (!isLoading && user) navigate('/');
-  }, [user, isLoading]);
+    if (!isLoading && user && mode !== 'reset') navigate('/');
+  }, [user, isLoading, mode]);
 
   useEffect(() => {
-    if (searchParams.get('verified') === 'true') {
-      setMode('signin');
-      setInfo('Email verified! You can now sign in.');
-    }
-    if (searchParams.get('reset') === 'true') {
-      setMode('signin');
-      setInfo('Password reset! Sign in with your new password.');
-    }
+    if (searchParams.get('verified') === 'true') { setMode('signin'); setInfo('Email verified! You can now sign in.'); }
+    if (searchParams.get('reset') === 'true')    { setMode('signin'); setInfo('Password reset! Sign in with your new password.'); }
   }, [searchParams]);
 
-  const clr = () => { setError(''); setInfo(''); };
-  const isStrong = (pw: string) => PW_RULES.every(r => r.test(pw));
+  // Handle Supabase recovery hash
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash.includes('type=recovery')) {
+      setMode('reset');
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+  }, []);
+
+  const clr       = () => { setError(''); setInfo(''); };
+  const isStrong  = (pw: string) => PW_RULES.every(r => r.test(pw));
+
+  // Signup
+  async function handleSignup() {
+    clr();
+    if (!fullName.trim()) { setError('Please enter your full name.'); return; }
+    if (!isStrong(password)) { setError('Password does not meet all requirements.'); return; }
+    if (password !== confirm) { setError('Passwords do not match.'); return; }
+    setBusy(true);
+    const res = await signUp(email.trim(), password, fullName.trim());
+    setBusy(false);
+    if (!res.success) {
+      if (res.error === 'account_exists') {
+        setError('An account with this email already exists.');
+        setInfo('Please sign in instead.');
+        setTimeout(() => { setMode('signin'); setEmail(email); clr(); }, 2500);
+      } else setError(res.error ?? 'Signup failed.');
+      return;
+    }
+    setMode('verify');
+  }
+
+  // Signin
+  async function handleSignin() {
+    clr();
+    if (!email.trim() || !password) { setError('Please fill in all fields.'); return; }
+    setBusy(true);
+    const ok = await signIn(email.trim(), password);
+    setBusy(false);
+    if (ok) navigate('/');
+  }
+
+  // Forgot
+  async function handleForgot() {
+    clr();
+    if (!email.trim()) { setError('Please enter your email.'); return; }
+    setBusy(true);
+    const ok = await resetPassword(email.trim());
+    setBusy(false);
+    if (ok) setForgotSent(true);
+  }
+
+  // Reset new password (after clicking email link)
+  async function handleReset() {
+    clr();
+    if (!isStrong(newPassword)) { setError('Password does not meet all requirements.'); return; }
+    if (newPassword !== newConfirm) { setError('Passwords do not match.'); return; }
+    setBusy(true);
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    setBusy(false);
+    if (error) { setError(error.message); return; }
+    setResetDone(true);
+    setTimeout(() => { setMode('signin'); setInfo('Password updated! Sign in with your new password.'); }, 2000);
+  }
+
+  // OTP send
+  async function handleOtpSend() {
+    clr();
+    if (!otpEmail.trim()) { setError('Please enter your email.'); return; }
+    setBusy(true);
+    const { error } = await supabase.auth.signInWithOtp({
+      email: otpEmail.trim(),
+      options: { shouldCreateUser: true },
+    });
+    setBusy(false);
+    if (error) { setError(error.message); return; }
+    setOtpSent(true);
+    setInfo('OTP sent to your email. Check your inbox.');
+  }
+
+  // OTP verify
+  async function handleOtpVerify() {
+    clr();
+    if (!otpCode.trim()) { setError('Please enter the OTP.'); return; }
+    setBusy(true);
+    const { error } = await supabase.auth.verifyOtp({
+      email: otpEmail.trim(),
+      token: otpCode.trim(),
+      type:  'email',
+    });
+    setBusy(false);
+    if (error) { setError(error.message); return; }
+    navigate('/');
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    clr();
-
-    if (mode === 'signup') {
-      if (!fullName.trim()) { setError('Please enter your full name.'); return; }
-      if (!isStrong(password)) { setError('Password does not meet all requirements.'); return; }
-      if (password !== confirm) { setError('Passwords do not match.'); return; }
-      setBusy(true);
-      const res = await signUp(email.trim(), password, fullName.trim());
-      setBusy(false);
-      if (!res.success) {
-        if (res.error === 'account_exists') {
-          setError('An account with this email already exists.');
-          setInfo('Please sign in instead.');
-          setTimeout(() => { setMode('signin'); setEmail(email); clr(); }, 2500);
-        } else {
-          setError(res.error ?? 'Signup failed. Please try again.');
-        }
-        return;
-      }
-      setMode('verify');
-      return;
-    }
-
-    if (mode === 'signin') {
-      if (!email.trim() || !password) { setError('Please fill in all fields.'); return; }
-      setBusy(true);
-      const ok = await signIn(email.trim(), password);
-      setBusy(false);
-      if (ok) navigate('/');
-      return;
-    }
-
-    if (mode === 'forgot') {
-      if (!email.trim()) { setError('Please enter your email.'); return; }
-      setBusy(true);
-      const ok = await resetPassword(email.trim());
-      setBusy(false);
-      if (ok) setForgotSent(true);
-      return;
-    }
+    if (mode === 'signin')  handleSignin();
+    if (mode === 'signup')  handleSignup();
+    if (mode === 'forgot')  handleForgot();
+    if (mode === 'reset')   handleReset();
+    if (mode === 'otp')     otpSent ? handleOtpVerify() : handleOtpSend();
   }
+
+  const titles: Record<Mode, string> = {
+    signin: 'Welcome Back',
+    signup: 'Create Account',
+    forgot: 'Reset Password',
+    verify: 'Check Your Email',
+    reset:  'Set New Password',
+    otp:    'Login with OTP',
+  };
+  const subs: Record<Mode, string> = {
+    signin: 'Sign in to Waves & Wires',
+    signup: 'Join us for exclusive deals',
+    forgot: "We'll send a reset link to your email",
+    verify: `Verification link sent to ${email}`,
+    reset:  'Enter your new password below',
+    otp:    'No password needed — sign in with email OTP',
+  };
 
   return (
     <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-4 py-12 bg-secondary/30">
@@ -130,18 +212,8 @@ export default function AuthPage() {
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary shadow-sm shadow-primary/30">
               <span className="text-sm font-black text-primary-foreground">W&W</span>
             </div>
-            <h1 className="text-xl font-black text-foreground">
-              {mode === 'signin' && 'Welcome Back'}
-              {mode === 'signup' && 'Create Account'}
-              {mode === 'forgot' && 'Reset Password'}
-              {mode === 'verify' && 'Check Your Email'}
-            </h1>
-            <p className="mt-1.5 text-sm text-muted-foreground">
-              {mode === 'signin' && 'Sign in to Waves & Wires'}
-              {mode === 'signup' && 'Join us for exclusive deals'}
-              {mode === 'forgot' && "We'll send a reset link to your email"}
-              {mode === 'verify' && `Verification link sent to ${email}`}
-            </p>
+            <h1 className="text-xl font-black text-foreground">{titles[mode]}</h1>
+            <p className="mt-1.5 text-sm text-muted-foreground">{subs[mode]}</p>
           </div>
 
           {error && (
@@ -164,51 +236,74 @@ export default function AuthPage() {
                 <Mail className="h-8 w-8 text-green-600" />
               </div>
               <p className="text-sm text-muted-foreground">Click the link in the email to verify your account. Check your spam folder if you don't see it.</p>
-              <button onClick={() => { setMode('signin'); clr(); }} className="text-sm text-primary font-bold hover:underline">
-                ← Back to Sign In
-              </button>
+              <button onClick={() => { setMode('signin'); clr(); }} className="text-sm text-primary font-bold hover:underline">← Back to Sign In</button>
             </div>
           )}
 
-          {mode !== 'verify' && (
+          {/* Reset done state */}
+          {mode === 'reset' && resetDone && (
+            <div className="text-center space-y-4 py-4">
+              <div className="h-16 w-16 rounded-full bg-green-100 flex items-center justify-center mx-auto">
+                <CheckCircle2 className="h-8 w-8 text-green-600" />
+              </div>
+              <p className="text-sm font-bold text-foreground">Password updated!</p>
+              <p className="text-sm text-muted-foreground">Redirecting to sign in…</p>
+            </div>
+          )}
+
+          {mode !== 'verify' && !resetDone && (
             <form onSubmit={handleSubmit} className="space-y-4">
 
+              {/* SIGNUP */}
               {mode === 'signup' && (
                 <div>
                   <label className="mb-1.5 block text-xs font-bold text-muted-foreground uppercase tracking-wider">Full Name *</label>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <input type="text" required autoFocus value={fullName}
-                      onChange={e => { setFullName(e.target.value); clr(); }}
-                      placeholder="Rahul Sharma" className={inputCls} />
+                    <input type="text" required autoFocus value={fullName} onChange={e => { setFullName(e.target.value); clr(); }} placeholder="Rahul Sharma" className={inputCls} />
                   </div>
                 </div>
               )}
 
-              <div>
-                <label className="mb-1.5 block text-xs font-bold text-muted-foreground uppercase tracking-wider">Email *</label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <input type="email" required value={email}
-                    onChange={e => { setEmail(e.target.value); clr(); }}
-                    placeholder="you@example.com"
-                    autoFocus={mode !== 'signup'}
-                    className={inputCls} />
+              {/* EMAIL — signin, signup, forgot, otp */}
+              {(mode === 'signin' || mode === 'signup' || mode === 'forgot') && (
+                <div>
+                  <label className="mb-1.5 block text-xs font-bold text-muted-foreground uppercase tracking-wider">Email *</label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <input type="email" required value={email} onChange={e => { setEmail(e.target.value); clr(); }} placeholder="you@example.com" autoFocus={mode !== 'signup'} className={inputCls} />
+                  </div>
                 </div>
-              </div>
+              )}
 
+              {/* OTP mode */}
+              {mode === 'otp' && (
+                <>
+                  <div>
+                    <label className="mb-1.5 block text-xs font-bold text-muted-foreground uppercase tracking-wider">Email *</label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <input type="email" required value={otpEmail} onChange={e => { setOtpEmail(e.target.value); clr(); }} placeholder="you@example.com" disabled={otpSent} className={inputCls} />
+                    </div>
+                  </div>
+                  {otpSent && (
+                    <div>
+                      <label className="mb-1.5 block text-xs font-bold text-muted-foreground uppercase tracking-wider">OTP Code *</label>
+                      <input type="text" required inputMode="numeric" maxLength={6} value={otpCode} onChange={e => { setOtpCode(e.target.value); clr(); }} placeholder="Enter 6-digit OTP" autoFocus className={inputNoPl} />
+                      <button type="button" onClick={() => { setOtpSent(false); setOtpCode(''); clr(); }} className="mt-1 text-xs text-muted-foreground hover:text-primary">Use different email</button>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* PASSWORD — signin, signup */}
               {(mode === 'signin' || mode === 'signup') && (
                 <div>
                   <label className="mb-1.5 block text-xs font-bold text-muted-foreground uppercase tracking-wider">Password *</label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <input type={showPw ? 'text' : 'password'} required
-                      minLength={mode === 'signup' ? 8 : 1}
-                      value={password}
-                      onChange={e => { setPassword(e.target.value); clr(); }}
-                      placeholder="••••••••" className={inputCls} />
-                    <button type="button" onClick={() => setShowPw(v => !v)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                    <input type={showPw ? 'text' : 'password'} required minLength={mode === 'signup' ? 8 : 1} value={password} onChange={e => { setPassword(e.target.value); clr(); }} placeholder="••••••••" className={inputCls} />
+                    <button type="button" onClick={() => setShowPw(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                       {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>
@@ -216,17 +311,14 @@ export default function AuthPage() {
                 </div>
               )}
 
+              {/* CONFIRM PASSWORD — signup */}
               {mode === 'signup' && (
                 <div>
                   <label className="mb-1.5 block text-xs font-bold text-muted-foreground uppercase tracking-wider">Confirm Password *</label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <input type={showCon ? 'text' : 'password'} required value={confirm}
-                      onChange={e => { setConfirm(e.target.value); clr(); }}
-                      placeholder="••••••••"
-                      className={`${inputCls} ${confirm ? (confirm === password ? 'border-green-400' : 'border-red-300') : ''}`} />
-                    <button type="button" onClick={() => setShowCon(v => !v)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                    <input type={showCon ? 'text' : 'password'} required value={confirm} onChange={e => { setConfirm(e.target.value); clr(); }} placeholder="••••••••" className={`${inputCls} ${confirm ? (confirm === password ? 'border-green-400' : 'border-red-300') : ''}`} />
+                    <button type="button" onClick={() => setShowCon(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                       {showCon ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>
@@ -235,14 +327,43 @@ export default function AuthPage() {
                 </div>
               )}
 
+              {/* NEW PASSWORD — reset mode */}
+              {mode === 'reset' && (
+                <>
+                  <div>
+                    <label className="mb-1.5 block text-xs font-bold text-muted-foreground uppercase tracking-wider">New Password *</label>
+                    <div className="relative">
+                      <KeyRound className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <input type={showNew ? 'text' : 'password'} required autoFocus value={newPassword} onChange={e => { setNewPassword(e.target.value); clr(); }} placeholder="••••••••" className={inputCls} />
+                      <button type="button" onClick={() => setShowNew(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                        {showNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    <PasswordStrength password={newPassword} />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-xs font-bold text-muted-foreground uppercase tracking-wider">Confirm New Password *</label>
+                    <div className="relative">
+                      <KeyRound className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <input type={showNewCon ? 'text' : 'password'} required value={newConfirm} onChange={e => { setNewConfirm(e.target.value); clr(); }} placeholder="••••••••" className={`${inputCls} ${newConfirm ? (newConfirm === newPassword ? 'border-green-400' : 'border-red-300') : ''}`} />
+                      <button type="button" onClick={() => setShowNewCon(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                        {showNewCon ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    {newConfirm && newConfirm !== newPassword && <p className="mt-1 text-xs text-red-500 flex items-center gap-1"><XCircle className="h-3 w-3" />Passwords do not match</p>}
+                    {newConfirm && newConfirm === newPassword && <p className="mt-1 text-xs text-green-600 flex items-center gap-1"><CheckCircle2 className="h-3 w-3" />Passwords match</p>}
+                  </div>
+                </>
+              )}
+
+              {/* Forgot password link */}
               {mode === 'signin' && (
                 <div className="text-right -mt-1">
-                  <button type="button" onClick={() => { setMode('forgot'); clr(); }} className="text-xs text-primary hover:underline font-semibold">
-                    Forgot password?
-                  </button>
+                  <button type="button" onClick={() => { setMode('forgot'); clr(); }} className="text-xs text-primary hover:underline font-semibold">Forgot password?</button>
                 </div>
               )}
 
+              {/* Forgot sent state */}
               {mode === 'forgot' && forgotSent ? (
                 <div className="flex flex-col items-center gap-3 py-4 text-center">
                   <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
@@ -260,6 +381,8 @@ export default function AuthPage() {
                         {mode === 'signin' && <><ArrowRight className="h-4 w-4" />Sign In</>}
                         {mode === 'signup' && <><User className="h-4 w-4" />Create Account</>}
                         {mode === 'forgot' && <><Mail className="h-4 w-4" />Send Reset Link</>}
+                        {mode === 'reset'  && <><KeyRound className="h-4 w-4" />Set New Password</>}
+                        {mode === 'otp'    && <><ShieldCheck className="h-4 w-4" />{otpSent ? 'Verify OTP' : 'Send OTP'}</>}
                       </>
                   }
                 </button>
@@ -267,10 +390,24 @@ export default function AuthPage() {
             </form>
           )}
 
-          <div className="mt-6 text-center text-sm text-muted-foreground">
-            {mode === 'signin' && <>Don't have an account?{' '}<button onClick={() => { setMode('signup'); clr(); }} className="text-primary font-bold hover:underline">Sign up free</button></>}
-            {mode === 'signup' && <>Already have an account?{' '}<button onClick={() => { setMode('signin'); clr(); }} className="text-primary font-bold hover:underline">Sign in</button></>}
-            {mode === 'forgot' && <button onClick={() => { setMode('signin'); clr(); }} className="text-primary font-bold hover:underline">← Back to Sign In</button>}
+          {/* Bottom links */}
+          <div className="mt-6 space-y-3 text-center text-sm text-muted-foreground">
+            {mode === 'signin' && (
+              <>
+                <p>Don't have an account?{' '}<button onClick={() => { setMode('signup'); clr(); }} className="text-primary font-bold hover:underline">Sign up free</button></p>
+                <p>
+                  <button onClick={() => { setMode('otp'); clr(); }} className="text-xs text-muted-foreground hover:text-primary transition-colors">
+                    🔑 Sign in with OTP instead
+                  </button>
+                </p>
+              </>
+            )}
+            {mode === 'signup' && (
+              <p>Already have an account?{' '}<button onClick={() => { setMode('signin'); clr(); }} className="text-primary font-bold hover:underline">Sign in</button></p>
+            )}
+            {(mode === 'forgot' || mode === 'otp') && (
+              <button onClick={() => { setMode('signin'); clr(); setOtpSent(false); setOtpCode(''); }} className="text-primary font-bold hover:underline">← Back to Sign In</button>
+            )}
           </div>
         </div>
 
