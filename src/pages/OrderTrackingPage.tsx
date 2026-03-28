@@ -15,7 +15,7 @@ interface Order {
   tracking_number: string | null; shipping_address: any;
   order_items: Array<{ id: string; product_name: string; product_image: string; quantity: number; price: number; total: number }>;
   refund_status?: string | null;
-    awb_code?: string | null;
+  awb_code?: string | null;
   courier_name?: string | null;
   shiprocket_order_id?: string | null;
 }
@@ -59,8 +59,8 @@ export default function OrderTrackingPage() {
   const loadMyOrders = useCallback(async () => {
     if (!user) return;
     const { data } = await supabase.from('orders')
-  .select('*, order_items(*), awb_code, courier_name, shiprocket_order_id')
-  .eq('user_id', user.id).order('created_at', { ascending: false });
+      .select('*, order_items(*), awb_code, courier_name, shiprocket_order_id')
+      .eq('user_id', user.id).order('created_at', { ascending: false });
 
     setMyOrders(await enrichWithRefundStatus(data ?? []));
   }, [user]);
@@ -72,8 +72,8 @@ export default function OrderTrackingPage() {
     if (!q.trim()) return;
     setLoading(true); setSearched(true);
     const { data } = await supabase.from('orders')
-  .select('*, order_items(*), awb_code, courier_name, shiprocket_order_id')
-  .ilike('order_number', q.trim()).single();
+      .select('*, order_items(*), awb_code, courier_name, shiprocket_order_id')
+      .ilike('order_number', q.trim()).single();
     if (data) {
       const [enriched] = await enrichWithRefundStatus([data]);
       setOrder(enriched ?? null);
@@ -160,26 +160,33 @@ export default function OrderTrackingPage() {
 
   function OrderCard({ o }: { o: Order }) {
     const step = TIMELINE.indexOf(o.status);
-  const [srTracking, setSrTracking] = useState<any>(null);
-  const [srLoading,  setSrLoading]  = useState(false);
+    const [srTracking, setSrTracking] = useState<any>(null);
+    const [srLoading,  setSrLoading]  = useState(false);
 
-  async function fetchTracking() {
-    if (!o.awb_code) return;
-    setSrLoading(true);
-    try {
-      const res = await fetch('/api/shiprocket', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'track_awb', payload: { awb: o.awb_code } }),
-      });
-      const data = await res.json();
-      setSrTracking(data?.tracking_data ?? data ?? null);
-    } catch { toast.error('Could not fetch tracking'); }
-    setSrLoading(false);
-  }
+    // useCallback taaki dependency sahi se kaam kare
+    const fetchTracking = useCallback(async () => {
+      if (!o.awb_code) return;
+      setSrLoading(true);
+      try {
+        const res = await fetch('/api/shiprocket', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'track_awb', payload: { awb: o.awb_code } }),
+        });
+        const data = await res.json();
+        setSrTracking(data?.tracking_data ?? data ?? null);
+      } catch { toast.error('Could not fetch tracking'); }
+      setSrLoading(false);
+    }, [o.awb_code]);
+
+    // NAYA: Auto-fetch live tracking jab bhi OrderCard load ho (agar AWB code ho toh)
+    useEffect(() => {
+      if (o.awb_code && !srTracking) {
+        fetchTracking();
+      }
+    }, [o.awb_code, fetchTracking, srTracking]);
 
     return (
     <div className="rounded-2xl border border-border bg-card p-4 space-y-4">
-      {/* ... existing header, images, timeline same rehega ... */}
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="font-bold text-foreground text-sm">#{o.order_number}</p>
@@ -230,7 +237,7 @@ export default function OrderTrackingPage() {
             <button onClick={fetchTracking} disabled={srLoading}
               className="flex items-center gap-1.5 text-xs font-semibold text-blue-700 bg-blue-100 hover:bg-blue-200 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50">
               {srLoading ? <span className="h-3 w-3 rounded-full border-2 border-blue-300 border-t-blue-700 animate-spin"/> : <RefreshCw className="h-3 w-3"/>}
-              {srLoading ? 'Loading…' : 'Track'}
+              {srLoading ? 'Loading…' : 'Refresh'}
             </button>
           </div>
           {srTracking && (
@@ -241,7 +248,7 @@ export default function OrderTrackingPage() {
               {srTracking.etd && <p className="text-[11px] text-blue-600">Expected delivery: {srTracking.etd}</p>}
               {srTracking.awb_track_url && (
                 <a href={srTracking.awb_track_url} target="_blank" rel="noopener noreferrer"
-                  className="text-[11px] text-blue-700 font-bold hover:underline">
+                  className="text-[11px] text-blue-700 font-bold hover:underline block">
                   Track on courier website →
                 </a>
               )}
@@ -276,7 +283,7 @@ export default function OrderTrackingPage() {
       )}
     </div>
   );
-}
+  }
 
   return (
     <div className="container py-6 sm:py-10 max-w-2xl">

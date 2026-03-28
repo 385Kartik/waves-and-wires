@@ -89,11 +89,71 @@ export default function CheckoutPage() {
     return result.order_number!;
   }
 
+  // ─── AUTO PUSH TO SHIPROCKET FUNCTION ─────────────────────────────────
+  async function autoPushToShiprocket(orderNum: string) {
+    try {
+      const payload = {
+        order_id: orderNum,
+        order_date: new Date().toISOString().split('T')[0],
+        pickup_location: 'Primary', // DHYAN DE: Ise apne warehouse ke exact naam se replace kar agar 'Primary' nahi hai toh
+        billing_customer_name: address.full_name,
+        billing_last_name: '',
+        billing_address: address.address_line_1,
+        billing_address_2: address.address_line_2 || '',
+        billing_city: address.city,
+        billing_pincode: address.postal_code,
+        billing_state: address.state,
+        billing_country: 'India',
+        billing_email: user?.email || 'customer@wavesandwires.in',
+        billing_phone: address.phone,
+        shipping_is_billing: true,
+        order_items: items.map(item => ({
+          name: item.product.name,
+          sku: item.product.sku || 'SKU-001',
+          units: item.quantity,
+          selling_price: item.product.price,
+          discount: '', tax: '', hsn: '',
+        })),
+        payment_method: payMethod === 'cod' ? 'COD' : 'Prepaid',
+        sub_total: subtotal,
+        length: 10, breadth: 10, height: 10, weight: 0.5,
+      };
+
+      const res = await fetch('/api/shiprocket', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'create_order', payload }),
+      });
+
+      const srData = await res.json();
+
+      if (srData.order_id) {
+        // Automatically mark as confirmed and save AWB if generated
+        await supabase.from('orders').update({
+          shiprocket_order_id: String(srData.order_id),
+          awb_code: srData.awb_code || null,
+          courier_name: srData.courier_name || null,
+          status: 'confirmed'
+        }).eq('order_number', orderNum);
+      } else {
+        console.error('Shiprocket auto-push error:', srData);
+      }
+    } catch (error) {
+      console.error('Failed to auto-push order to Shiprocket:', error);
+      // System crash nahi karega, user ko order success dikh jayega. Admin panel me pending dikhega.
+    }
+  }
+  // ───────────────────────────────────────────────────────────────────────
+
   async function placeCOD() {
     if (!user) { toast.error('Sign in first'); navigate('/auth'); return; }
     setPlacing(true);
     try {
       const orderNum = await saveOrder('cod', 'pending');
+      
+      // Order DB me save hote hi Shiprocket ko bhej do
+      await autoPushToShiprocket(orderNum);
+
       clearCart();
       toast.success('Order placed! Pay on delivery.');
       sendEmail(user.email, `Order Confirmed — ${orderNum}`,
@@ -131,6 +191,10 @@ export default function CheckoutPage() {
           handler: async (response: { razorpay_payment_id: string }) => {
             try {
               const orderNum = await saveOrder('razorpay', 'paid', response.razorpay_payment_id);
+              
+              // Payment success aur DB me save hote hi Shiprocket bhej do
+              await autoPushToShiprocket(orderNum);
+
               clearCart();
               toast.success('Payment successful! Order confirmed.');
               sendEmail(user.email, `Payment Confirmed — ${orderNum}`,
