@@ -15,6 +15,9 @@ interface Order {
   tracking_number: string | null; shipping_address: any;
   order_items: Array<{ id: string; product_name: string; product_image: string; quantity: number; price: number; total: number }>;
   refund_status?: string | null;
+    awb_code?: string | null;
+  courier_name?: string | null;
+  shiprocket_order_id?: string | null;
 }
 
 const TIMELINE = ['pending','confirmed','processing','shipped','delivered'];
@@ -55,8 +58,10 @@ export default function OrderTrackingPage() {
 
   const loadMyOrders = useCallback(async () => {
     if (!user) return;
-    const { data } = await supabase.from('orders').select('*, order_items(*)')
-      .eq('user_id', user.id).order('created_at', { ascending: false });
+    const { data } = await supabase.from('orders')
+  .select('*, order_items(*), awb_code, courier_name, shiprocket_order_id')
+  .eq('user_id', user.id).order('created_at', { ascending: false });
+
     setMyOrders(await enrichWithRefundStatus(data ?? []));
   }, [user]);
 
@@ -66,8 +71,9 @@ export default function OrderTrackingPage() {
     const q = num ?? query;
     if (!q.trim()) return;
     setLoading(true); setSearched(true);
-    const { data } = await supabase.from('orders').select('*, order_items(*)')
-      .ilike('order_number', q.trim()).single();
+    const { data } = await supabase.from('orders')
+  .select('*, order_items(*), awb_code, courier_name, shiprocket_order_id')
+  .ilike('order_number', q.trim()).single();
     if (data) {
       const [enriched] = await enrichWithRefundStatus([data]);
       setOrder(enriched ?? null);
@@ -154,72 +160,123 @@ export default function OrderTrackingPage() {
 
   function OrderCard({ o }: { o: Order }) {
     const step = TIMELINE.indexOf(o.status);
+  const [srTracking, setSrTracking] = useState<any>(null);
+  const [srLoading,  setSrLoading]  = useState(false);
+
+  async function fetchTracking() {
+    if (!o.awb_code) return;
+    setSrLoading(true);
+    try {
+      const res = await fetch('/api/shiprocket', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'track_awb', payload: { awb: o.awb_code } }),
+      });
+      const data = await res.json();
+      setSrTracking(data?.tracking_data ?? data ?? null);
+    } catch { toast.error('Could not fetch tracking'); }
+    setSrLoading(false);
+  }
+
     return (
-      <div className="rounded-2xl border border-border bg-card p-4 space-y-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="font-bold text-foreground text-sm">#{o.order_number}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">{format(new Date(o.created_at),'dd MMM yyyy, h:mm a')}</p>
-          </div>
-          <div className="flex flex-col items-end gap-1.5">
-            <p className="font-bold text-foreground text-sm">{INR(o.total)}</p>
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize ${o.status==='delivered'?'bg-green-100 text-green-700':o.status==='cancelled'?'bg-red-100 text-red-700':'bg-amber-100 text-amber-700'}`}>{o.status}</span>
-            {refundBadge(o)}
-          </div>
+    <div className="rounded-2xl border border-border bg-card p-4 space-y-4">
+      {/* ... existing header, images, timeline same rehega ... */}
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-bold text-foreground text-sm">#{o.order_number}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{format(new Date(o.created_at),'dd MMM yyyy, h:mm a')}</p>
         </div>
-
-        <div className="flex items-center gap-2 overflow-x-auto pb-1">
-          {o.order_items?.slice(0,4).map(item=>(
-            <div key={item.id} className="shrink-0">
-              {item.product_image
-                ? <img src={item.product_image} alt={item.product_name} className="h-11 w-11 rounded-xl object-cover border border-border" />
-                : <div className="h-11 w-11 rounded-xl bg-secondary flex items-center justify-center"><Package className="h-4 w-4 text-muted-foreground" /></div>}
-            </div>
-          ))}
-          {(o.order_items?.length??0)>4 && (
-            <div className="h-11 w-11 rounded-xl bg-secondary flex items-center justify-center shrink-0">
-              <span className="text-xs font-bold text-muted-foreground">+{o.order_items.length-4}</span>
-            </div>
-          )}
+        <div className="flex flex-col items-end gap-1.5">
+          <p className="font-bold text-foreground text-sm">{INR(o.total)}</p>
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize ${o.status==='delivered'?'bg-green-100 text-green-700':o.status==='cancelled'?'bg-red-100 text-red-700':'bg-amber-100 text-amber-700'}`}>{o.status}</span>
+          {refundBadge(o)}
         </div>
+      </div>
 
-        {!['cancelled'].includes(o.status) && (
-          <div className="flex items-center gap-0">
-            {TIMELINE.map((s,i)=>(
-              <div key={s} className="flex items-center flex-1 last:flex-none">
-                <div className={`h-2 w-2 rounded-full shrink-0 ${i<=step?'bg-primary':'bg-border'}`} />
-                {i<TIMELINE.length-1 && <div className={`h-0.5 flex-1 ${i<step?'bg-primary':'bg-border'}`} />}
-              </div>
-            ))}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1">
+        {o.order_items?.slice(0,4).map(item=>(
+          <div key={item.id} className="shrink-0">
+            {item.product_image
+              ? <img src={item.product_image} alt={item.product_name} className="h-11 w-11 rounded-xl object-cover border border-border" />
+              : <div className="h-11 w-11 rounded-xl bg-secondary flex items-center justify-center"><Package className="h-4 w-4 text-muted-foreground" /></div>}
           </div>
-        )}
-
-        {o.tracking_number && <p className="text-xs text-muted-foreground">Tracking: <span className="font-mono font-semibold text-foreground">{o.tracking_number}</span></p>}
-
-        {user && (
-          <div className="flex flex-wrap gap-2">
-            {canCancel(o) && (
-              <button onClick={()=>{setCancelModal(o);setCancelReason('');setCancelOther('');}}
-                className="flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-100 transition-all">
-                <XCircle className="h-3.5 w-3.5" />Cancel Order
-              </button>
-            )}
-            {canRefund(o) && (
-              <button onClick={()=>{setRefundModal(o);setRefundReason('');}}
-                className="flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition-all">
-                <RefreshCw className="h-3.5 w-3.5" />Request Refund
-              </button>
-            )}
-            {o.refund_status==='rejected' && (
-              <span className="flex items-center gap-1.5 text-xs text-red-600 font-medium">
-                <XCircle className="h-3.5 w-3.5" />Refund rejected. Contact support.
-              </span>
-            )}
+        ))}
+        {(o.order_items?.length??0)>4 && (
+          <div className="h-11 w-11 rounded-xl bg-secondary flex items-center justify-center shrink-0">
+            <span className="text-xs font-bold text-muted-foreground">+{o.order_items.length-4}</span>
           </div>
         )}
       </div>
-    );
-  }
+
+      {!['cancelled'].includes(o.status) && (
+        <div className="flex items-center gap-0">
+          {TIMELINE.map((s,i)=>(
+            <div key={s} className="flex items-center flex-1 last:flex-none">
+              <div className={`h-2 w-2 rounded-full shrink-0 ${i<=step?'bg-primary':'bg-border'}`} />
+              {i<TIMELINE.length-1 && <div className={`h-0.5 flex-1 ${i<step?'bg-primary':'bg-border'}`} />}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Tracking number + Live Shiprocket tracking */}
+      {o.awb_code && (
+        <div className="rounded-xl bg-blue-50 border border-blue-200 p-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-bold text-blue-700 uppercase tracking-wider">Live Tracking</p>
+              <p className="text-xs font-mono font-bold text-blue-900 mt-0.5">AWB: {o.awb_code}</p>
+              {o.courier_name && <p className="text-[10px] text-blue-600">{o.courier_name}</p>}
+            </div>
+            <button onClick={fetchTracking} disabled={srLoading}
+              className="flex items-center gap-1.5 text-xs font-semibold text-blue-700 bg-blue-100 hover:bg-blue-200 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50">
+              {srLoading ? <span className="h-3 w-3 rounded-full border-2 border-blue-300 border-t-blue-700 animate-spin"/> : <RefreshCw className="h-3 w-3"/>}
+              {srLoading ? 'Loading…' : 'Track'}
+            </button>
+          </div>
+          {srTracking && (
+            <div className="border-t border-blue-200 pt-2 space-y-1">
+              <p className="text-xs font-bold text-blue-800">
+                {srTracking.shipment_status || srTracking.current_status || 'In Transit'}
+              </p>
+              {srTracking.etd && <p className="text-[11px] text-blue-600">Expected delivery: {srTracking.etd}</p>}
+              {srTracking.awb_track_url && (
+                <a href={srTracking.awb_track_url} target="_blank" rel="noopener noreferrer"
+                  className="text-[11px] text-blue-700 font-bold hover:underline">
+                  Track on courier website →
+                </a>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+      {o.tracking_number && !o.awb_code && (
+        <p className="text-xs text-muted-foreground">Tracking: <span className="font-mono font-semibold text-foreground">{o.tracking_number}</span></p>
+      )}
+
+      {user && (
+        <div className="flex flex-wrap gap-2">
+          {canCancel(o) && (
+            <button onClick={()=>{setCancelModal(o);setCancelReason('');setCancelOther('');}}
+              className="flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-100 transition-all">
+              <XCircle className="h-3.5 w-3.5" />Cancel Order
+            </button>
+          )}
+          {canRefund(o) && (
+            <button onClick={()=>{setRefundModal(o);setRefundReason('');}}
+              className="flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition-all">
+              <RefreshCw className="h-3.5 w-3.5" />Request Refund
+            </button>
+          )}
+          {o.refund_status==='rejected' && (
+            <span className="flex items-center gap-1.5 text-xs text-red-600 font-medium">
+              <XCircle className="h-3.5 w-3.5" />Refund rejected. Contact support.
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
   return (
     <div className="container py-6 sm:py-10 max-w-2xl">
