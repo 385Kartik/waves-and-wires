@@ -1,4 +1,3 @@
-import fetch from 'node-fetch';
 const BASE = 'https://apiv2.shiprocket.in/v1/external';
 let cachedToken = null, tokenExpiry = null;
 
@@ -30,10 +29,6 @@ export default async function handler(req, res) {
     }
     if (action === 'track_awb') {
       const r = await fetch(`${BASE}/courier/track/awb/${payload.awb}`, { headers });
-      return res.status(200).json(await r.json());
-    }
-    if (action === 'get_order') {
-      const r = await fetch(`${BASE}/orders/show/${payload.order_id}`, { headers });
       return res.status(200).json(await r.json());
     }
     return res.status(400).json({ error: 'Unknown action' });
