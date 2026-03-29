@@ -286,3 +286,33 @@ export function deliveryEmailHtml(name: string, orderNum: string, total: number)
     </div>
   `, `Your order #${orderNum} has been successfully delivered!`);
 }
+
+// ─── Contact form admin notification ──────────────────────────────────────
+export function contactAdminHtml(name: string, email: string, subject: string, message: string): string {
+  return base(`
+    <h2 style="margin:0 0 8px;font-size:22px;font-weight:800;color:#111;">📬 New Contact Message</h2>
+    <p style="margin:0 0 24px;font-size:14px;color:#6b7280;">Someone submitted the contact form on your site.</p>
+
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation"
+           style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;margin-bottom:24px;">
+      <tr><td style="padding:12px 18px;border-bottom:1px solid #e5e7eb;">
+        <span style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;">From</span><br/>
+        <span style="font-size:14px;font-weight:700;color:#111;">${name}</span>
+        <span style="font-size:13px;color:#6b7280;"> &lt;${email}&gt;</span>
+      </td></tr>
+      <tr><td style="padding:12px 18px;border-bottom:1px solid #e5e7eb;">
+        <span style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;">Subject</span><br/>
+        <span style="font-size:14px;font-weight:700;color:#111;">${subject}</span>
+      </td></tr>
+      <tr><td style="padding:12px 18px;">
+        <span style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;">Message</span><br/>
+        <p style="margin:6px 0 0;font-size:13px;color:#374151;line-height:1.7;white-space:pre-line;">${message}</p>
+      </td></tr>
+    </table>
+
+    <a href="mailto:${email}"
+       style="display:inline-block;background:${BRAND_COLOR};color:#111;font-weight:800;padding:12px 28px;border-radius:10px;text-decoration:none;font-size:13px;">
+      Reply to ${name} →
+    </a>
+  `, `New contact message: ${subject}`);
+}
