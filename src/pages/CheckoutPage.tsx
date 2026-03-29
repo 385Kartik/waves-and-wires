@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { sendEmail, orderConfirmHtml } from '@/lib/email';
+import { sendSms, orderConfirmSms } from '@/lib/sms';
 
 declare global { interface Window { Razorpay: any; } }
 
@@ -90,64 +91,73 @@ export default function CheckoutPage() {
   }
 
   // ─── AUTO PUSH TO SHIPROCKET FUNCTION ─────────────────────────────────
-  async function autoPushToShiprocket(orderNum: string) {
-    try {
-      const payload = {
-        order_id: orderNum,
-        order_date: new Date().toISOString().split('T')[0],
-        pickup_location: 'Primary', // DHYAN DE: Ise apne warehouse ke exact naam se replace kar agar 'Primary' nahi hai toh
-        billing_customer_name: address.full_name,
-        billing_last_name: '',
-        billing_address: address.address_line_1,
-        billing_address_2: address.address_line_2 || '',
-        billing_city: address.city,
-        billing_pincode: address.postal_code,
-        billing_state: address.state,
-        billing_country: 'India',
-        billing_email: user?.email || 'customer@wavesandwires.in',
-        billing_phone: address.phone,
-        shipping_is_billing: true,
-        order_items: items.map(item => ({
-          name: item.product.name,
-          sku: item.product.sku || 'SKU-001',
-          units: item.quantity,
-          selling_price: item.product.price,
-          discount: '', tax: '', hsn: '',
-        })),
-        payment_method: payMethod === 'cod' ? 'COD' : 'Prepaid',
-        sub_total: subtotal,
-        length: 10, breadth: 10, height: 10, weight: 0.5,
-      };
+  // ─── AUTO PUSH TO SHIPROCKET ────────────────────────────────────────────────
+async function autoPushToShiprocket(orderNum: string) {
+  try {
+    const payload = {
+      order_id:       orderNum,
+      order_date:     new Date().toISOString().split('T')[0],
+      pickup_location: 'Primary',
+      billing_customer_name: address.full_name,
+      billing_last_name:     '',
+      billing_address:       address.address_line_1,
+      billing_address_2:     address.address_line_2 || '',
+      billing_city:          address.city,
+      billing_pincode:       address.postal_code,
+      billing_state:         address.state,
+      billing_country:       'India',
+      billing_email:         user?.email || 'customer@wavesandwires.in',
+      billing_phone:         address.phone,
+      shipping_is_billing:   true,
+      order_items: items.map(item => ({
+        name:          item.product.name,
+        sku:           item.product.sku || 'SKU-001',
+        units:         item.quantity,
+        selling_price: item.product.price,
+        discount: '', tax: '', hsn: '',
+      })),
+      payment_method: payMethod === 'cod' ? 'COD' : 'Prepaid',
+      sub_total:  subtotal,
+      length: 10, breadth: 10, height: 10, weight: 0.5,
+    };
 
-      const res = await fetch('/api/shiprocket', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'create_order', payload }),
-      });
+    const res  = await fetch('/api/shiprocket', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ action: 'create_order', payload }),
+    });
+    const srData = await res.json();
 
-      const srData = await res.json();
-
-      if (srData.order_id) {
-        // Automatically mark as confirmed and save AWB if generated
-        await supabase.from('orders').update({
-          shiprocket_order_id: String(srData.order_id),
-          awb_code: srData.awb_code || null,
-          courier_name: srData.courier_name || null,
-          status: 'confirmed'
-        }).eq('order_number', orderNum);
-      } else {
-        console.error('Shiprocket auto-push error:', srData);
-      }
-    } catch (error) {
-      console.error('Failed to auto-push order to Shiprocket:', error);
-      // System crash nahi karega, user ko order success dikh jayega. Admin panel me pending dikhega.
+    if (srData.order_id) {
+      await supabase.from('orders').update({
+        shiprocket_order_id:     String(srData.order_id),
+        shiprocket_shipment_id:  srData.shipment_id ? String(srData.shipment_id) : null,
+        awb_code:                srData.awb_code    || null,
+        courier_name:            srData.courier_name || null,
+        status:                  'confirmed',
+      }).eq('order_number', orderNum);
+    } else {
+      // SR push fail — order DB mein pending rahega, admin panel mein dikhega
+      console.error('[AutoPush] Shiprocket order creation failed:', srData);
     }
+  } catch (err) {
+    // Silent fail — user ko order success dikh jaata hai,
+    // admin panel se manually push kar sakte hain
+    console.error('[AutoPush] Shiprocket push exception:', err);
   }
-  // ───────────────────────────────────────────────────────────────────────
+}
+// ────────────────────────────────────────────────────────────────────────────
+  
 
   async function placeCOD() {
     if (!user) { toast.error('Sign in first'); navigate('/auth'); return; }
     setPlacing(true);
+// Checkout ke start mein:
+if (!user.email_verified || !user.phone_verified) {
+  toast.error('Please verify both email and phone before placing orders.');
+  navigate('/account');
+  return;
+}
     try {
       const orderNum = await saveOrder('cod', 'pending');
       
@@ -158,6 +168,7 @@ export default function CheckoutPage() {
       toast.success('Order placed! Pay on delivery.');
       sendEmail(user.email, `Order Confirmed — ${orderNum}`,
         orderConfirmHtml({ name: address.full_name, orderNum, items, subtotal, discount, shipping, tax, total, paymentMethod: 'cod' }));
+        if (user.phone) sendSms(user.phone, orderConfirmSms(orderNum, total, user.full_name));
       navigate(`/order-tracking?order=${orderNum}`);
     } catch (err: any) {
       toast.error(err.message ?? 'Failed to place order');
@@ -167,6 +178,13 @@ export default function CheckoutPage() {
   async function placeRazorpay() {
     if (!user) { toast.error('Sign in first'); navigate('/auth'); return; }
     setPlacing(true);
+
+// Checkout ke start mein:
+if (!user.email_verified || !user.phone_verified) {
+  toast.error('Please verify both email and phone before placing orders.');
+  navigate('/account');
+  return;
+}
     try {
       const loaded = await new Promise<boolean>(resolve => {
         if (window.Razorpay) { resolve(true); return; }

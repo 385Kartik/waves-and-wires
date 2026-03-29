@@ -3,7 +3,7 @@ import { Mail, Phone, MapPin, Send, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { useStoreSettings } from '@/hooks/useStoreSettings';
-import { sendEmail, contactAdminHtml } from '@/lib/email';
+import { contactAdminHtml } from '@/lib/email';
 
 export default function ContactPage() {
   const { settings } = useStoreSettings();
