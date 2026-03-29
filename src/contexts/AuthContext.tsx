@@ -13,17 +13,28 @@ export interface AuthUser {
 interface AuthContextType {
   user: AuthUser | null; session: Session | null;
   isLoading: boolean; isAdmin: boolean;
-  signUp: (email: string, password: string, fullName: string) => Promise<{ success: boolean; error?: string }>;
-  signIn: (email: string, password: string) => Promise<boolean>;
-  signOut: () => Promise<void>;
-  resetPassword: (email: string) => Promise<boolean>;
-  updateProfile: (data: { full_name?: string; phone?: string }) => Promise<boolean>;
+  signUp:          (email: string, password: string, fullName: string) => Promise<{ success: boolean; error?: string }>;
+  signIn:          (email: string, password: string) => Promise<boolean>;
+  signOut:         () => Promise<void>;
+  resetPassword:   (email: string) => Promise<boolean>;
+  updateProfile:   (data: { full_name?: string; phone?: string }) => Promise<boolean>;
+  // ── Phone auth ──────────────────────────────────────────────────────────
+  sendPhoneOtp:    (phone: string) => Promise<boolean>;
+  verifyPhoneOtp:  (phone: string, token: string) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Normalise Indian phone numbers to E.164 (+91XXXXXXXXXX)
+export function normalisePhone(raw: string): string {
+  const digits = raw.replace(/\D/g, '');
+  if (digits.startsWith('91') && digits.length === 12) return `+${digits}`;
+  if (digits.length === 10) return `+91${digits}`;
+  return `+${digits}`; // pass through if already E.164 or unknown format
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const [user,    setUser]    = useState<AuthUser | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setLoading] = useState(true);
 
@@ -32,21 +43,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSession(sess);
     const { data: profile } = await supabase.from('profiles').select('*').eq('id', sess.user.id).single();
     setUser({
-      id: sess.user.id,
-      email: sess.user.email ?? '',
-      full_name: profile?.full_name ?? sess.user.user_metadata?.full_name ?? '',
-      phone: profile?.phone ?? undefined,
-      avatar_url: profile?.avatar_url ?? undefined,
+      id:             sess.user.id,
+      email:          sess.user.email          ?? '',
+      full_name:      profile?.full_name       ?? sess.user.user_metadata?.full_name ?? '',
+      phone:          profile?.phone           ?? sess.user.phone ?? undefined,
+      avatar_url:     profile?.avatar_url      ?? undefined,
       email_verified: sess.user.email_confirmed_at != null,
-      is_admin: profile?.is_admin ?? false,
-      created_at: sess.user.created_at,
+      is_admin:       profile?.is_admin        ?? false,
+      created_at:     sess.user.created_at,
     });
     setLoading(false);
   }
 
   useEffect(() => {
     let mounted = true;
-    supabase.auth.getSession().then(({ data: { session } }) => { if (mounted) handleSession(session); });
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (mounted) handleSession(session);
+    });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted || event === 'INITIAL_SESSION') return;
       handleSession(session);
@@ -63,16 +76,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       },
     });
     if (error) {
-      if (error.message.toLowerCase().includes('already registered') || error.message.toLowerCase().includes('already exists'))
+      const msg = error.message.toLowerCase();
+      if (msg.includes('already registered') || msg.includes('already exists'))
         return { success: false, error: 'account_exists' };
       return { success: false, error: error.message };
     }
     if (data.user && (!data.user.identities || data.user.identities.length === 0))
       return { success: false, error: 'account_exists' };
-
-    // Welcome email
     sendEmail(email, 'Welcome to Waves & Wires! 🎉', welcomeEmailHtml(fullName));
-
     return { success: true };
   }
 
@@ -103,10 +114,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return true;
   }
 
+  // ── Phone OTP: Send ────────────────────────────────────────────────────
+  // Requires Twilio (or MessageBird) configured in your Supabase project:
+  // Dashboard → Authentication → Phone → Enable + add Twilio credentials
+  async function sendPhoneOtp(phone: string): Promise<boolean> {
+    const formatted = normalisePhone(phone);
+    const { error } = await supabase.auth.signInWithOtp({
+      phone: formatted,
+      options: { shouldCreateUser: true },
+    });
+    if (error) { toast.error(error.message); return false; }
+    return true;
+  }
+
+  // ── Phone OTP: Verify ──────────────────────────────────────────────────
+  async function verifyPhoneOtp(phone: string, token: string): Promise<boolean> {
+    const formatted = normalisePhone(phone);
+    const { error } = await supabase.auth.verifyOtp({
+      phone: formatted,
+      token: token.trim(),
+      type:  'sms',
+    });
+    if (error) { toast.error(error.message); return false; }
+    return true;
+  }
+
   return (
     <AuthContext.Provider value={{
-      user, session, isLoading, isAdmin: user?.is_admin ?? false,
+      user, session, isLoading,
+      isAdmin: user?.is_admin ?? false,
       signUp, signIn, signOut, resetPassword, updateProfile,
+      sendPhoneOtp, verifyPhoneOtp,
     }}>
       {children}
     </AuthContext.Provider>
