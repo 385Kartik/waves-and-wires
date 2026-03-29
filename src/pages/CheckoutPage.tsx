@@ -151,6 +151,11 @@ async function autoPushToShiprocket(orderNum: string) {
   async function placeCOD() {
     if (!user) { toast.error('Sign in first'); navigate('/auth'); return; }
     setPlacing(true);
+if (!user?.email_verified) {
+  toast.error('Please verify your email to place orders.');
+  navigate('/auth');
+  return;
+}
     try {
       const orderNum = await saveOrder('cod', 'pending');
       
@@ -170,6 +175,12 @@ async function autoPushToShiprocket(orderNum: string) {
   async function placeRazorpay() {
     if (!user) { toast.error('Sign in first'); navigate('/auth'); return; }
     setPlacing(true);
+
+if (!user?.email_verified) {
+  toast.error('Please verify your email to place orders.');
+  navigate('/auth');
+  return;
+}
     try {
       const loaded = await new Promise<boolean>(resolve => {
         if (window.Razorpay) { resolve(true); return; }

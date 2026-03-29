@@ -1,15 +1,26 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { toast } from 'sonner';
 import {
   Eye, EyeOff, Mail, Lock, User, ArrowRight, CheckCircle2,
-  XCircle, AlertCircle, ShieldCheck, KeyRound, Phone,
+  XCircle, AlertCircle, ShieldCheck, KeyRound, Phone, ChevronRight,
 } from 'lucide-react';
 import { useAuth, normalisePhone } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 
-// ─── Password rules ───────────────────────────────────────────────────────
-type Mode = 'signin' | 'signup' | 'forgot' | 'verify' | 'reset' | 'emailotp' | 'phone';
+// ─── Types ────────────────────────────────────────────────────────────────────
+type Mode =
+  | 'signin'
+  | 'signup'          // step 1: name + email + password
+  | 'signup_phone'    // step 2: phone number (triggers actual signUp)
+  | 'email_collect'   // phone-OTP users must add email after OTP verify
+  | 'forgot'
+  | 'verify'
+  | 'reset'
+  | 'emailotp'
+  | 'phone';
 
+// ─── Password rules ───────────────────────────────────────────────────────────
 const PW_RULES = [
   { label: 'At least 8 characters',     test: (p: string) => p.length >= 8 },
   { label: 'One uppercase letter (A-Z)', test: (p: string) => /[A-Z]/.test(p) },
@@ -23,7 +34,7 @@ function PasswordStrength({ password }: { password: string }) {
   const passed = PW_RULES.filter(r => r.test(password)).length;
   const pct    = (passed / PW_RULES.length) * 100;
   const color  = pct <= 40 ? 'bg-red-500' : pct <= 70 ? 'bg-amber-400' : 'bg-green-500';
-  const label  = pct <= 40 ? 'Weak' : pct <= 70 ? 'Fair' : pct < 100 ? 'Good' : 'Strong';
+  const label  = pct <= 40 ? 'Weak'       : pct <= 70 ? 'Fair'         : pct < 100 ? 'Good' : 'Strong';
   return (
     <div className="mt-2 space-y-1.5">
       <div className="flex items-center gap-2">
@@ -45,52 +56,62 @@ function PasswordStrength({ password }: { password: string }) {
   );
 }
 
-const inputCls   = "w-full rounded-xl border border-border bg-secondary/60 py-2.5 pl-10 pr-10 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all";
-const inputNoPl  = "w-full rounded-xl border border-border bg-secondary/60 py-2.5 px-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all";
+const inputCls  = "w-full rounded-xl border border-border bg-secondary/60 py-2.5 pl-10 pr-10 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all";
+const inputPlain = "w-full rounded-xl border border-border bg-secondary/60 py-2.5 px-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all";
 
-// ─── Component ────────────────────────────────────────────────────────────
+// ─── SKIP auto-navigate for these modes ──────────────────────────────────────
+const SKIP_NAV: Mode[] = ['reset', 'signup_phone', 'email_collect'];
+
+// ─── Component ────────────────────────────────────────────────────────────────
 export default function AuthPage() {
-  const { signIn, signUp, resetPassword, user, isLoading, sendPhoneOtp, verifyPhoneOtp } = useAuth();
+  const { signIn, signUp, resetPassword, addEmail, user, isLoading, sendPhoneOtp, verifyPhoneOtp } = useAuth();
   const navigate       = useNavigate();
   const [searchParams] = useSearchParams();
 
-  const [mode,       setMode]       = useState<Mode>('signin');
-  const [email,      setEmail]      = useState('');
-  const [password,   setPassword]   = useState('');
-  const [confirm,    setConfirm]    = useState('');
-  const [fullName,   setFullName]   = useState('');
-  const [showPw,     setShowPw]     = useState(false);
-  const [showCon,    setShowCon]    = useState(false);
-  const [busy,       setBusy]       = useState(false);
-  const [error,      setError]      = useState('');
-  const [info,       setInfo]       = useState('');
-  const [forgotSent, setForgotSent] = useState(false);
+  // ── Mode + shared form state ─────────────────────────────────────────────
+  const [mode,      setMode]    = useState<Mode>('signin');
+  const [email,     setEmail]   = useState('');
+  const [password,  setPassword] = useState('');
+  const [confirm,   setConfirm]  = useState('');
+  const [fullName,  setFullName] = useState('');
+  const [showPw,    setShowPw]   = useState(false);
+  const [showCon,   setShowCon]  = useState(false);
+  const [busy,      setBusy]     = useState(false);
+  const [error,     setError]    = useState('');
+  const [info,      setInfo]     = useState('');
 
-  // Reset password
-  const [newPassword, setNewPassword] = useState('');
-  const [newConfirm,  setNewConfirm]  = useState('');
-  const [showNew,     setShowNew]     = useState(false);
-  const [showNewCon,  setShowNewCon]  = useState(false);
-  const [resetDone,   setResetDone]   = useState(false);
+  // ── Step 2 — phone for email-signup users ────────────────────────────────
+  const [signupPhone,   setSignupPhone]   = useState('');
 
-  // Email OTP
-  const [otpEmail, setOtpEmail] = useState('');
-  const [otpSent,  setOtpSent]  = useState(false);
-  const [otpCode,  setOtpCode]  = useState('');
+  // ── Step 2 — email for phone-OTP users ──────────────────────────────────
+  const [emailCollect,  setEmailCollect]  = useState('');
 
-  // Phone OTP
-  const [phoneNum,      setPhoneNum]      = useState('');
-  const [phoneSent,     setPhoneSent]     = useState(false);
-  const [phoneOtpCode,  setPhoneOtpCode]  = useState('');
-  const [phoneFormatted, setPhoneFormatted] = useState('');
+  // ── Forgot / reset ───────────────────────────────────────────────────────
+  const [forgotSent,   setForgotSent]   = useState(false);
+  const [newPassword,  setNewPassword]  = useState('');
+  const [newConfirm,   setNewConfirm]   = useState('');
+  const [showNew,      setShowNew]      = useState(false);
+  const [showNewCon,   setShowNewCon]   = useState(false);
+  const [resetDone,    setResetDone]    = useState(false);
 
-  useEffect(() => {
-    if (!isLoading && user && mode !== 'reset') navigate('/');
-  }, [user, isLoading, mode]);
+  // ── Email OTP ────────────────────────────────────────────────────────────
+  const [otpEmail,  setOtpEmail]  = useState('');
+  const [otpSent,   setOtpSent]   = useState(false);
+  const [otpCode,   setOtpCode]   = useState('');
 
+  // ── Phone OTP ────────────────────────────────────────────────────────────
+  const [phoneNum,        setPhoneNum]       = useState('');
+  const [phoneSent,       setPhoneSent]      = useState(false);
+  const [phoneOtpCode,    setPhoneOtpCode]   = useState('');
+  const [phoneFormatted,  setPhoneFormatted] = useState('');
+
+  // ref to detect "new phone user needs email" without race condition
+  const requiresEmailCollect = useRef(false);
+
+  // ── URL params ───────────────────────────────────────────────────────────
   useEffect(() => {
     if (searchParams.get('verified') === 'true') { setMode('signin'); setInfo('Email verified! You can now sign in.'); }
-    if (searchParams.get('reset') === 'true')    { setMode('signin'); setInfo('Password reset! Sign in with your new password.'); }
+    if (searchParams.get('reset')    === 'true') { setMode('signin'); setInfo('Password reset! Sign in with your new password.'); }
   }, [searchParams]);
 
   useEffect(() => {
@@ -101,30 +122,26 @@ export default function AuthPage() {
     }
   }, []);
 
+  // ── Auto navigate when user is signed in ────────────────────────────────
+  useEffect(() => {
+    if (!isLoading && user) {
+      // Phone-OTP new user needs to add email first
+      if (requiresEmailCollect.current) {
+        requiresEmailCollect.current = false;
+        setMode('email_collect');
+        return;
+      }
+      if (!SKIP_NAV.includes(mode)) navigate('/');
+    }
+  }, [user, isLoading, mode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
   const clr      = () => { setError(''); setInfo(''); };
   const isStrong = (pw: string) => PW_RULES.every(r => r.test(pw));
 
   // ── Handlers ─────────────────────────────────────────────────────────────
 
-  async function handleSignup() {
-    clr();
-    if (!fullName.trim()) { setError('Please enter your full name.'); return; }
-    if (!isStrong(password)) { setError('Password does not meet all requirements.'); return; }
-    if (password !== confirm) { setError('Passwords do not match.'); return; }
-    setBusy(true);
-    const res = await signUp(email.trim(), password, fullName.trim());
-    setBusy(false);
-    if (!res.success) {
-      if (res.error === 'account_exists') {
-        setError('An account with this email already exists.');
-        setInfo('Please sign in instead.');
-        setTimeout(() => { setMode('signin'); setEmail(email); clr(); }, 2500);
-      } else setError(res.error ?? 'Signup failed.');
-      return;
-    }
-    setMode('verify');
-  }
-
+  // SIGNIN
   async function handleSignin() {
     clr();
     if (!email.trim() || !password) { setError('Please fill in all fields.'); return; }
@@ -134,6 +151,53 @@ export default function AuthPage() {
     if (ok) navigate('/');
   }
 
+  // SIGNUP step 1 — validate only, move to phone step
+  function handleSignupNext() {
+    clr();
+    if (!fullName.trim())      { setError('Please enter your full name.'); return; }
+    if (!email.trim())         { setError('Please enter your email.'); return; }
+    if (!isStrong(password))   { setError('Password does not meet all requirements.'); return; }
+    if (password !== confirm)  { setError('Passwords do not match.'); return; }
+    setMode('signup_phone');
+  }
+
+  // SIGNUP step 2 — collect phone, then create account
+  async function handleSignupPhone() {
+    clr();
+    const digits = signupPhone.replace(/\D/g, '');
+    if (digits.length < 10) { setError('Please enter a valid 10-digit mobile number.'); return; }
+    setBusy(true);
+    const res = await signUp(email.trim(), password, fullName.trim(), signupPhone);
+    setBusy(false);
+    if (!res.success) {
+      if (res.error === 'account_exists') {
+        setError('An account with this email already exists.');
+        setInfo('Please sign in instead.');
+        setTimeout(() => { setMode('signin'); setEmail(email); clr(); }, 2500);
+      } else {
+        setError(res.error ?? 'Signup failed. Please try again.');
+      }
+      return;
+    }
+    setMode('verify');
+  }
+
+  // EMAIL COLLECT — for phone-OTP new users
+  async function handleEmailCollect() {
+    clr();
+    const cleanEmail = emailCollect.trim().toLowerCase();
+    if (!cleanEmail.includes('@')) { setError('Please enter a valid email address.'); return; }
+    setBusy(true);
+    const ok = await addEmail(cleanEmail);
+    setBusy(false);
+    if (!ok) return;
+    // User is signed in via phone; a verification email is sent.
+    // They can browse; placing orders requires email_verified = true.
+    toast.info(`Verification email sent to ${cleanEmail}. Verify it to place orders.`, { duration: 6000 });
+    navigate('/');
+  }
+
+  // FORGOT
   async function handleForgot() {
     clr();
     if (!email.trim()) { setError('Please enter your email.'); return; }
@@ -143,6 +207,7 @@ export default function AuthPage() {
     if (ok) setForgotSent(true);
   }
 
+  // RESET
   async function handleReset() {
     clr();
     if (!isStrong(newPassword)) { setError('Password does not meet all requirements.'); return; }
@@ -155,14 +220,13 @@ export default function AuthPage() {
     setTimeout(() => { setMode('signin'); setInfo('Password updated! Sign in with your new password.'); }, 2000);
   }
 
-  // Email OTP
+  // EMAIL OTP — send
   async function handleEmailOtpSend() {
     clr();
     if (!otpEmail.trim()) { setError('Please enter your email.'); return; }
     setBusy(true);
     const { error } = await supabase.auth.signInWithOtp({
-      email: otpEmail.trim(),
-      options: { shouldCreateUser: true },
+      email: otpEmail.trim(), options: { shouldCreateUser: true },
     });
     setBusy(false);
     if (error) { setError(error.message); return; }
@@ -170,6 +234,7 @@ export default function AuthPage() {
     setInfo('OTP sent to your email. Check your inbox.');
   }
 
+  // EMAIL OTP — verify
   async function handleEmailOtpVerify() {
     clr();
     if (!otpCode.trim()) { setError('Please enter the OTP.'); return; }
@@ -182,7 +247,7 @@ export default function AuthPage() {
     navigate('/');
   }
 
-  // Phone OTP
+  // PHONE OTP — send
   async function handlePhoneOtpSend() {
     clr();
     const digits = phoneNum.replace(/\D/g, '');
@@ -197,49 +262,62 @@ export default function AuthPage() {
     setInfo(`OTP sent to ${formatted}. Check your SMS.`);
   }
 
+  // PHONE OTP — verify
   async function handlePhoneOtpVerify() {
     clr();
     if (phoneOtpCode.trim().length !== 6) { setError('Please enter the 6-digit OTP.'); return; }
     setBusy(true);
     const ok = await verifyPhoneOtp(phoneFormatted, phoneOtpCode);
+    if (!ok) { setBusy(false); return; }
+    // Check if this is a new user (no email on auth user)
+    const { data: { user: freshUser } } = await supabase.auth.getUser();
+    if (!freshUser?.email) {
+      requiresEmailCollect.current = true;
+    }
     setBusy(false);
-    if (ok) navigate('/');
+    // If user has email, the useEffect navigation to '/' will trigger.
+    // If no email, requiresEmailCollect ref will redirect to email_collect mode.
   }
 
+  // ── Form submit router ────────────────────────────────────────────────────
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (mode === 'signin')   return handleSignin();
-    if (mode === 'signup')   return handleSignup();
-    if (mode === 'forgot')   return handleForgot();
-    if (mode === 'reset')    return handleReset();
-    if (mode === 'emailotp') return otpSent ? handleEmailOtpVerify() : handleEmailOtpSend();
-    if (mode === 'phone')    return phoneSent ? handlePhoneOtpVerify() : handlePhoneOtpSend();
+    if (mode === 'signin')        return handleSignin();
+    if (mode === 'signup')        return handleSignupNext();
+    if (mode === 'signup_phone')  return handleSignupPhone();
+    if (mode === 'email_collect') return handleEmailCollect();
+    if (mode === 'forgot')        return handleForgot();
+    if (mode === 'reset')         return handleReset();
+    if (mode === 'emailotp')      return otpSent ? handleEmailOtpVerify() : handleEmailOtpSend();
+    if (mode === 'phone')         return phoneSent ? handlePhoneOtpVerify() : handlePhoneOtpSend();
   }
 
-  // ── Title / subtitle maps ─────────────────────────────────────────────
-
+  // ── Title / subtitle maps ─────────────────────────────────────────────────
   const titles: Record<Mode, string> = {
-    signin:   'Welcome Back',
-    signup:   'Create Account',
-    forgot:   'Reset Password',
-    verify:   'Check Your Email',
-    reset:    'Set New Password',
-    emailotp: 'Login with Email OTP',
-    phone:    'Login with Phone OTP',
+    signin:        'Welcome Back',
+    signup:        'Create Account',
+    signup_phone:  'Add Your Phone',
+    email_collect: 'Add Your Email',
+    forgot:        'Reset Password',
+    verify:        'Check Your Email',
+    reset:         'Set New Password',
+    emailotp:      'Login with Email OTP',
+    phone:         'Login with Phone OTP',
   };
 
   const subs: Record<Mode, string> = {
-    signin:   'Sign in to Waves & Wires',
-    signup:   'Join us for exclusive deals',
-    forgot:   "We'll send a reset link to your email",
-    verify:   `Verification link sent to ${email}`,
-    reset:    'Enter your new password below',
-    emailotp: 'No password needed — sign in with OTP',
-    phone:    'Enter your mobile number to receive OTP',
+    signin:        'Sign in to Waves & Wires',
+    signup:        'Join us for exclusive deals',
+    signup_phone:  'Required to complete your account setup',
+    email_collect: 'Required to receive order updates & invoices',
+    forgot:        "We'll send a reset link to your email",
+    verify:        `Verification link sent to ${email}`,
+    reset:         'Enter your new password below',
+    emailotp:      'No password needed — sign in with OTP',
+    phone:         'Enter your mobile number to receive OTP',
   };
 
   // ─────────────────────────────────────────────────────────────────────────
-
   return (
     <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-4 py-12 bg-secondary/30">
       <div className="w-full max-w-md">
@@ -247,6 +325,13 @@ export default function AuthPage() {
 
           {/* Branding */}
           <div className="mb-7 text-center">
+            {/* Step indicator for signup flow */}
+            {(mode === 'signup' || mode === 'signup_phone') && (
+              <div className="flex items-center justify-center gap-2 mb-4">
+                <div className={`h-2 w-8 rounded-full transition-all ${mode === 'signup' ? 'bg-primary' : 'bg-primary/30'}`} />
+                <div className={`h-2 w-8 rounded-full transition-all ${mode === 'signup_phone' ? 'bg-primary' : 'bg-primary/30'}`} />
+              </div>
+            )}
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary shadow-sm shadow-primary/30">
               <span className="text-sm font-black text-primary-foreground">W&W</span>
             </div>
@@ -268,7 +353,7 @@ export default function AuthPage() {
             </div>
           )}
 
-          {/* ── Verify state ───────────────────────────────────────────── */}
+          {/* ── Verify email screen ──────────────────────────────────── */}
           {mode === 'verify' && (
             <div className="text-center space-y-4 py-4">
               <div className="h-16 w-16 rounded-full bg-green-100 flex items-center justify-center mx-auto">
@@ -277,12 +362,15 @@ export default function AuthPage() {
               <p className="text-sm text-muted-foreground">
                 Click the link in the email to verify your account. Check your spam folder if you don't see it.
               </p>
+              <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-xs text-amber-700">
+                ⚠️ Email verification is required to place orders.
+              </div>
               <button onClick={() => { setMode('signin'); clr(); }}
                 className="text-sm text-primary font-bold hover:underline">← Back to Sign In</button>
             </div>
           )}
 
-          {/* ── Reset done state ───────────────────────────────────────── */}
+          {/* ── Reset done screen ───────────────────────────────────── */}
           {mode === 'reset' && resetDone && (
             <div className="text-center space-y-4 py-4">
               <div className="h-16 w-16 rounded-full bg-green-100 flex items-center justify-center mx-auto">
@@ -293,39 +381,160 @@ export default function AuthPage() {
             </div>
           )}
 
-          {/* ── Form ──────────────────────────────────────────────────── */}
+          {/* ── Form ─────────────────────────────────────────────────── */}
           {mode !== 'verify' && !resetDone && (
             <form onSubmit={handleSubmit} className="space-y-4">
 
-              {/* Full Name (signup only) */}
+              {/* SIGNUP step 1 ─────────────────────────────────────── */}
               {mode === 'signup' && (
-                <div>
-                  <label className="mb-1.5 block text-xs font-bold text-muted-foreground uppercase tracking-wider">Full Name *</label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <input type="text" required autoFocus value={fullName}
-                      onChange={e => { setFullName(e.target.value); clr(); }}
-                      placeholder="Rahul Sharma" className={inputCls} />
+                <>
+                  <div>
+                    <label className="mb-1.5 block text-xs font-bold text-muted-foreground uppercase tracking-wider">Full Name *</label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <input type="text" required autoFocus value={fullName}
+                        onChange={e => { setFullName(e.target.value); clr(); }}
+                        placeholder="Rahul Sharma" className={inputCls} />
+                    </div>
                   </div>
-                </div>
+                  <div>
+                    <label className="mb-1.5 block text-xs font-bold text-muted-foreground uppercase tracking-wider">Email *</label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <input type="email" required value={email}
+                        onChange={e => { setEmail(e.target.value); clr(); }}
+                        placeholder="you@example.com" className={inputCls} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-xs font-bold text-muted-foreground uppercase tracking-wider">Password *</label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <input type={showPw ? 'text' : 'password'} required minLength={8}
+                        value={password} onChange={e => { setPassword(e.target.value); clr(); }}
+                        placeholder="••••••••" className={inputCls} />
+                      <button type="button" onClick={() => setShowPw(v => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                        {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    <PasswordStrength password={password} />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-xs font-bold text-muted-foreground uppercase tracking-wider">Confirm Password *</label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <input type={showCon ? 'text' : 'password'} required value={confirm}
+                        onChange={e => { setConfirm(e.target.value); clr(); }}
+                        placeholder="••••••••"
+                        className={`${inputCls} ${confirm ? (confirm === password ? 'border-green-400' : 'border-red-300') : ''}`} />
+                      <button type="button" onClick={() => setShowCon(v => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                        {showCon ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    {confirm && confirm !== password && <p className="mt-1 text-xs text-red-500 flex items-center gap-1"><XCircle className="h-3 w-3" />Passwords do not match</p>}
+                    {confirm && confirm === password  && <p className="mt-1 text-xs text-green-600 flex items-center gap-1"><CheckCircle2 className="h-3 w-3" />Passwords match</p>}
+                  </div>
+                </>
               )}
 
-              {/* Email — signin, signup, forgot */}
-              {(mode === 'signin' || mode === 'signup' || mode === 'forgot') && (
+              {/* SIGNUP step 2 — phone ─────────────────────────────── */}
+              {mode === 'signup_phone' && (
+                <>
+                  <div className="rounded-xl bg-secondary/50 border border-border px-4 py-3 text-xs text-muted-foreground">
+                    Your phone number is used for account security and order support. It will never be shared.
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-xs font-bold text-muted-foreground uppercase tracking-wider">Mobile Number *</label>
+                    <div className="flex gap-2">
+                      <div className="flex items-center gap-1.5 rounded-xl border border-border bg-secondary/60 px-3 text-sm font-semibold text-foreground shrink-0">
+                        🇮🇳 +91
+                      </div>
+                      <input
+                        type="tel" required inputMode="numeric" maxLength={10} autoFocus
+                        value={signupPhone}
+                        onChange={e => { setSignupPhone(e.target.value.replace(/\D/g, '')); clr(); }}
+                        placeholder="9876543210"
+                        className="flex-1 rounded-xl border border-border bg-secondary/60 py-2.5 px-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                      />
+                    </div>
+                    <p className="mt-1.5 text-[11px] text-muted-foreground">
+                      We'll use this to contact you about your orders if needed.
+                    </p>
+                  </div>
+                </>
+              )}
+
+              {/* EMAIL COLLECT — phone-OTP new users ─────────────────── */}
+              {mode === 'email_collect' && (
+                <>
+                  <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-xs text-amber-700">
+                    📦 An email address is required to receive order confirmations, invoices, and shipping updates.
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-xs font-bold text-muted-foreground uppercase tracking-wider">Email Address *</label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <input type="email" required autoFocus value={emailCollect}
+                        onChange={e => { setEmailCollect(e.target.value); clr(); }}
+                        placeholder="you@example.com" className={inputCls} />
+                    </div>
+                    <p className="mt-1.5 text-[11px] text-muted-foreground">
+                      A verification email will be sent. Verify it to place orders.
+                    </p>
+                  </div>
+                </>
+              )}
+
+              {/* SIGNIN ───────────────────────────────────────────────── */}
+              {mode === 'signin' && (
+                <>
+                  <div>
+                    <label className="mb-1.5 block text-xs font-bold text-muted-foreground uppercase tracking-wider">Email *</label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <input type="email" required autoFocus value={email}
+                        onChange={e => { setEmail(e.target.value); clr(); }}
+                        placeholder="you@example.com" className={inputCls} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-xs font-bold text-muted-foreground uppercase tracking-wider">Password *</label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <input type={showPw ? 'text' : 'password'} required value={password}
+                        onChange={e => { setPassword(e.target.value); clr(); }}
+                        placeholder="••••••••" className={inputCls} />
+                      <button type="button" onClick={() => setShowPw(v => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                        {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="text-right -mt-1">
+                    <button type="button" onClick={() => { setMode('forgot'); clr(); }}
+                      className="text-xs text-primary hover:underline font-semibold">
+                      Forgot password?
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {/* FORGOT ──────────────────────────────────────────────── */}
+              {mode === 'forgot' && (
                 <div>
                   <label className="mb-1.5 block text-xs font-bold text-muted-foreground uppercase tracking-wider">Email *</label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <input type="email" required value={email}
+                    <input type="email" required autoFocus value={email}
                       onChange={e => { setEmail(e.target.value); clr(); }}
-                      placeholder="you@example.com"
-                      autoFocus={mode !== 'signup'}
-                      className={inputCls} />
+                      placeholder="you@example.com" className={inputCls} />
                   </div>
                 </div>
               )}
 
-              {/* ── Email OTP mode ─────────────────────────────────────── */}
+              {/* EMAIL OTP ────────────────────────────────────────────── */}
               {mode === 'emailotp' && (
                 <>
                   <div>
@@ -342,7 +551,7 @@ export default function AuthPage() {
                       <label className="mb-1.5 block text-xs font-bold text-muted-foreground uppercase tracking-wider">OTP Code *</label>
                       <input type="text" required inputMode="numeric" maxLength={6}
                         value={otpCode} onChange={e => { setOtpCode(e.target.value); clr(); }}
-                        placeholder="Enter 6-digit OTP" autoFocus className={inputNoPl} />
+                        placeholder="Enter 6-digit OTP" autoFocus className={inputPlain} />
                       <button type="button" onClick={() => { setOtpSent(false); setOtpCode(''); clr(); }}
                         className="mt-1 text-xs text-muted-foreground hover:text-primary">
                         Use different email
@@ -352,15 +561,12 @@ export default function AuthPage() {
                 </>
               )}
 
-              {/* ── Phone OTP mode ─────────────────────────────────────── */}
+              {/* PHONE OTP ────────────────────────────────────────────── */}
               {mode === 'phone' && (
                 <>
                   <div>
-                    <label className="mb-1.5 block text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                      Mobile Number *
-                    </label>
+                    <label className="mb-1.5 block text-xs font-bold text-muted-foreground uppercase tracking-wider">Mobile Number *</label>
                     <div className="flex gap-2">
-                      {/* Country code badge */}
                       <div className="flex items-center gap-1.5 rounded-xl border border-border bg-secondary/60 px-3 text-sm font-semibold text-foreground shrink-0">
                         🇮🇳 +91
                       </div>
@@ -368,9 +574,7 @@ export default function AuthPage() {
                         type="tel" required inputMode="numeric" maxLength={10}
                         value={phoneNum}
                         onChange={e => { setPhoneNum(e.target.value.replace(/\D/g, '')); clr(); }}
-                        placeholder="9876543210"
-                        disabled={phoneSent}
-                        autoFocus
+                        placeholder="9876543210" disabled={phoneSent} autoFocus
                         className="flex-1 rounded-xl border border-border bg-secondary/60 py-2.5 px-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all disabled:opacity-60"
                       />
                     </div>
@@ -378,19 +582,15 @@ export default function AuthPage() {
                       You'll receive a 6-digit OTP via SMS.
                     </p>
                   </div>
-
                   {phoneSent && (
                     <div>
-                      <label className="mb-1.5 block text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                        Enter OTP *
-                      </label>
+                      <label className="mb-1.5 block text-xs font-bold text-muted-foreground uppercase tracking-wider">Enter OTP *</label>
                       <input
                         type="text" required inputMode="numeric" maxLength={6}
                         value={phoneOtpCode}
                         onChange={e => { setPhoneOtpCode(e.target.value.replace(/\D/g, '')); clr(); }}
-                        placeholder="6-digit OTP"
-                        autoFocus
-                        className={`${inputNoPl} text-center tracking-[0.5em] font-bold text-lg`}
+                        placeholder="6-digit OTP" autoFocus
+                        className={`${inputPlain} text-center tracking-[0.5em] font-bold text-lg`}
                       />
                       <button type="button"
                         onClick={() => { setPhoneSent(false); setPhoneOtpCode(''); clr(); }}
@@ -402,46 +602,7 @@ export default function AuthPage() {
                 </>
               )}
 
-              {/* Password — signin, signup */}
-              {(mode === 'signin' || mode === 'signup') && (
-                <div>
-                  <label className="mb-1.5 block text-xs font-bold text-muted-foreground uppercase tracking-wider">Password *</label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <input type={showPw ? 'text' : 'password'} required
-                      minLength={mode === 'signup' ? 8 : 1}
-                      value={password} onChange={e => { setPassword(e.target.value); clr(); }}
-                      placeholder="••••••••" className={inputCls} />
-                    <button type="button" onClick={() => setShowPw(v => !v)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                      {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                  {mode === 'signup' && <PasswordStrength password={password} />}
-                </div>
-              )}
-
-              {/* Confirm password (signup) */}
-              {mode === 'signup' && (
-                <div>
-                  <label className="mb-1.5 block text-xs font-bold text-muted-foreground uppercase tracking-wider">Confirm Password *</label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <input type={showCon ? 'text' : 'password'} required value={confirm}
-                      onChange={e => { setConfirm(e.target.value); clr(); }}
-                      placeholder="••••••••"
-                      className={`${inputCls} ${confirm ? (confirm === password ? 'border-green-400' : 'border-red-300') : ''}`} />
-                    <button type="button" onClick={() => setShowCon(v => !v)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                      {showCon ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                  {confirm && confirm !== password && <p className="mt-1 text-xs text-red-500 flex items-center gap-1"><XCircle className="h-3 w-3" />Passwords do not match</p>}
-                  {confirm && confirm === password  && <p className="mt-1 text-xs text-green-600 flex items-center gap-1"><CheckCircle2 className="h-3 w-3" />Passwords match</p>}
-                </div>
-              )}
-
-              {/* New password (reset mode) */}
+              {/* RESET ────────────────────────────────────────────────── */}
               {mode === 'reset' && (
                 <>
                   <div>
@@ -477,17 +638,7 @@ export default function AuthPage() {
                 </>
               )}
 
-              {/* Forgot password link (signin only) */}
-              {mode === 'signin' && (
-                <div className="text-right -mt-1">
-                  <button type="button" onClick={() => { setMode('forgot'); clr(); }}
-                    className="text-xs text-primary hover:underline font-semibold">
-                    Forgot password?
-                  </button>
-                </div>
-              )}
-
-              {/* Submit button or Forgot-sent state */}
+              {/* Submit button ─────────────────────────────────────────── */}
               {mode === 'forgot' && forgotSent ? (
                 <div className="flex flex-col items-center gap-3 py-4 text-center">
                   <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
@@ -502,12 +653,14 @@ export default function AuthPage() {
                   {busy
                     ? <span className="h-4 w-4 rounded-full border-2 border-black/20 border-t-black animate-spin" />
                     : <>
-                        {mode === 'signin'   && <><ArrowRight className="h-4 w-4" />Sign In</>}
-                        {mode === 'signup'   && <><User className="h-4 w-4" />Create Account</>}
-                        {mode === 'forgot'   && <><Mail className="h-4 w-4" />Send Reset Link</>}
-                        {mode === 'reset'    && <><KeyRound className="h-4 w-4" />Set New Password</>}
-                        {mode === 'emailotp' && <><ShieldCheck className="h-4 w-4" />{otpSent ? 'Verify OTP' : 'Send OTP'}</>}
-                        {mode === 'phone'    && <><Phone className="h-4 w-4" />{phoneSent ? 'Verify OTP' : 'Send OTP via SMS'}</>}
+                        {mode === 'signin'        && <><ArrowRight className="h-4 w-4" />Sign In</>}
+                        {mode === 'signup'        && <><ChevronRight className="h-4 w-4" />Next — Add Phone</>}
+                        {mode === 'signup_phone'  && <><User className="h-4 w-4" />Create Account</>}
+                        {mode === 'email_collect' && <><Mail className="h-4 w-4" />Save Email & Continue</>}
+                        {mode === 'forgot'        && <><Mail className="h-4 w-4" />Send Reset Link</>}
+                        {mode === 'reset'         && <><KeyRound className="h-4 w-4" />Set New Password</>}
+                        {mode === 'emailotp'      && <><ShieldCheck className="h-4 w-4" />{otpSent ? 'Verify OTP' : 'Send OTP'}</>}
+                        {mode === 'phone'         && <><Phone className="h-4 w-4" />{phoneSent ? 'Verify OTP' : 'Send OTP via SMS'}</>}
                       </>
                   }
                 </button>
@@ -515,7 +668,7 @@ export default function AuthPage() {
             </form>
           )}
 
-          {/* ── Bottom links ──────────────────────────────────────────── */}
+          {/* ── Bottom links ─────────────────────────────────────────── */}
           <div className="mt-6 space-y-3 text-center text-sm text-muted-foreground">
 
             {mode === 'signin' && (
@@ -526,7 +679,6 @@ export default function AuthPage() {
                     Sign up free
                   </button>
                 </p>
-                {/* Login alternatives */}
                 <div className="flex items-center gap-3">
                   <div className="flex-1 h-px bg-border" />
                   <span className="text-xs text-muted-foreground">or sign in with</span>
@@ -547,13 +699,21 @@ export default function AuthPage() {
               </>
             )}
 
-            {mode === 'signup' && (
+            {(mode === 'signup' || mode === 'signup_phone') && (
               <p>
                 Already have an account?{' '}
                 <button onClick={() => { setMode('signin'); clr(); }} className="text-primary font-bold hover:underline">
                   Sign in
                 </button>
               </p>
+            )}
+
+            {mode === 'signup_phone' && (
+              <button
+                onClick={() => { setMode('signup'); clr(); }}
+                className="text-muted-foreground hover:text-foreground text-xs">
+                ← Back
+              </button>
             )}
 
             {(mode === 'forgot' || mode === 'emailotp' || mode === 'phone') && (
@@ -565,6 +725,14 @@ export default function AuthPage() {
                 }}
                 className="text-primary font-bold hover:underline">
                 ← Back to Sign In
+              </button>
+            )}
+
+            {/* email_collect — cannot go back, user is logged in via phone */}
+            {mode === 'email_collect' && (
+              <button onClick={() => navigate('/')}
+                className="text-muted-foreground hover:text-foreground text-xs">
+                Skip for now (some features unavailable)
               </button>
             )}
           </div>

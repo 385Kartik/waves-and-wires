@@ -316,55 +316,80 @@ export default function OrderTrackingPage() {
   // ── Cancel flow ───────────────────────────────────────────────────────────
 
   async function cancelOrder(o: Order) {
-    const reason = cancelReason === 'Other' ? cancelOther.trim() : cancelReason;
-    if (!reason) { toast.error('Please select a reason'); return; }
-
-    setActionLoading(true);
-    try {
-      // 1. DB mein cancel karo (RPC se validation hota hai)
-      const { data, error } = await supabase.rpc('cancel_order', {
-        p_order_id: o.id, p_reason: reason,
-      });
-      if (error) throw error;
-      const result = data as { success: boolean; error?: string };
-      if (!result.success) { toast.error(result.error ?? 'Could not cancel order'); return; }
-
-      // 2. Shiprocket mein cancel karo (AWB hai toh shipment level, nahi toh order level)
-      if (o.shiprocket_order_id) {
-        const srAction  = o.awb_code ? 'cancel_shipment' : 'cancel_order';
-        const srPayload = o.awb_code
-          ? { awb_code: o.awb_code }
-          : { shiprocket_order_id: o.shiprocket_order_id };
-        await fetch('/api/shiprocket', {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ action: srAction, payload: srPayload }),
-        }).catch(e => console.error('[SR Cancel]', e)); // silent — DB already updated
-      }
-
-      // 3. Email + toast
-      const isOnline = o.payment_method === 'razorpay' && o.payment_status === 'paid';
-      if (user?.email) {
-        sendEmail(
-          user.email,
-          `Order ${o.order_number} Cancelled`,
-          cancelEmailHtml(o.shipping_address?.full_name ?? 'Customer', o.order_number, o.total, reason, isOnline),
-        );
-      }
-      toast.success(isOnline
+  const reason = cancelReason === 'Other' ? cancelOther.trim() : cancelReason;
+  if (!reason) { toast.error('Please select a reason'); return; }
+  if (!user) { toast.error('Please sign in to cancel orders'); return; }
+ 
+  setActionLoading(true);
+  try {
+    // ── 1. Verify order is still cancellable (fresh read to avoid race) ──────
+    const { data: freshOrder, error: verifyErr } = await supabase
+      .from('orders')
+      .select('status, user_id')
+      .eq('id', o.id)
+      .single();
+ 
+    if (verifyErr || !freshOrder)
+      throw new Error('Could not verify order. Please refresh and try again.');
+ 
+    if (freshOrder.user_id !== user.id)
+      throw new Error('Unauthorized — this order does not belong to your account.');
+ 
+    if (!['pending', 'confirmed'].includes(freshOrder.status))
+      throw new Error(`Order cannot be cancelled. Current status: "${freshOrder.status}".`);
+ 
+    // ── 2. Cancel in DB ──────────────────────────────────────────────────────
+    const { error: cancelErr } = await supabase
+      .from('orders')
+      .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+      .eq('id', o.id)
+      .eq('user_id', user.id);  // double-check ownership at DB level
+ 
+    if (cancelErr) throw cancelErr;
+ 
+    // ── 3. Cancel in Shiprocket ──────────────────────────────────────────────
+    if (o.shiprocket_order_id) {
+      const srAction  = o.awb_code ? 'cancel_shipment' : 'cancel_order';
+      const srPayload = o.awb_code
+        ? { awb_code: o.awb_code }
+        : { shiprocket_order_id: o.shiprocket_order_id };
+ 
+      await fetch('/api/shiprocket', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ action: srAction, payload: srPayload }),
+      }).catch(e => console.warn('[SR Cancel silent fail]', e.message));
+    }
+ 
+    // ── 4. Email notification ─────────────────────────────────────────────────
+    const isOnline = o.payment_method === 'razorpay' && o.payment_status === 'paid';
+    if (user.email) {
+      sendEmail(
+        user.email,
+        `Order ${o.order_number} Cancelled`,
+        cancelEmailHtml(
+          o.shipping_address?.full_name ?? 'Customer',
+          o.order_number, o.total, reason, isOnline,
+        ),
+      );
+    }
+ 
+    // ── 5. UI cleanup ─────────────────────────────────────────────────────────
+    toast.success(
+      isOnline
         ? 'Order cancelled. Refund will be processed within 5–7 business days.'
         : 'Order cancelled successfully.',
-      );
-
-      setCancelModal(null); setCancelReason(''); setCancelOther('');
-      await loadMyOrders();
-      if (order?.id === o.id) setOrder(prev => prev ? { ...prev, status: 'cancelled' } : prev);
-    } catch (err: any) {
-      toast.error(err.message ?? 'Failed to cancel order');
-    } finally {
-      setActionLoading(false);
-    }
+    );
+    setCancelModal(null); setCancelReason(''); setCancelOther('');
+    await loadMyOrders();
+    if (order?.id === o.id) setOrder(prev => prev ? { ...prev, status: 'cancelled' } : prev);
+ 
+  } catch (err: any) {
+    toast.error(err.message ?? 'Failed to cancel order. Please try again.');
+  } finally {
+    setActionLoading(false);
   }
+}
 
   // ── Refund flow ───────────────────────────────────────────────────────────
 
