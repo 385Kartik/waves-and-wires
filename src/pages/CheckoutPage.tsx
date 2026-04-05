@@ -31,7 +31,7 @@ export default function CheckoutPage() {
     address_line_1: '', address_line_2: '', city: '', state: '', postal_code: '', country: 'India',
   });
 
-  const shipping = subtotal >= 999 ? 0 : 99;
+  const shipping = subtotal >= 999 ? 0 : 0;
   const discount = couponApplied?.discount ?? 0;
   const taxBase  = subtotal - discount;
   const tax      = Math.round(taxBase * 0.18);
