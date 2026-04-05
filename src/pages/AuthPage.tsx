@@ -11,12 +11,12 @@ import { supabase } from '@/lib/supabase';
 type Mode =
   | 'signin_email'
   | 'signin_phone'
-  | 'signup_email'     // Name, Email, Password
-  | 'signup_phone'     // Name, Phone, Password → WhatsApp OTP
-  | 'signup_phone_otp' // Enter OTP after SMS
+  | 'signup_email'
+  | 'signup_phone'
+  | 'signup_phone_otp'
   | 'forgot'
   | 'reset'
-  | 'verify';          // "Check your email" screen
+  | 'verify';
 
 // ─── Password rules ───────────────────────────────────────────────────────────
 const PW_RULES = [
@@ -160,7 +160,7 @@ export default function AuthPage() {
     if (password !== confirm) { setError('Passwords do not match.'); return; }
 
     setBusy(true);
-    // First: create the account
+    // Step 1: Account banao (signin yahan NAHI hoga)
     const res = await signUpWithPhone(phone, password, fullName.trim());
     if (!res.success) {
       setBusy(false);
@@ -171,10 +171,7 @@ export default function AuthPage() {
       return;
     }
 
-    // Then: sign in immediately (internal email)
-    await signInWithPhone(phone, password);
-
-    // Then: send WhatsApp OTP to verify phone
+    // Step 2: OTP bhejo — verify hone ke baad signin hoga
     const sent = await sendWhatsAppOtp(phone);
     setBusy(false);
     if (sent) setMode('signup_phone_otp');
@@ -184,9 +181,14 @@ export default function AuthPage() {
     clr();
     if (otp.trim().length !== 6) { setError('Enter the 6-digit OTP.'); return; }
     setBusy(true);
+    // Step 1: OTP verify karo — server side email_confirm = true ho jaayega
     const ok = await verifyWhatsAppOtp(phone, otp);
+    if (!ok) { setBusy(false); return; }
+
+    // Step 2: Ab signin karo — email confirmed hai toh 400 nahi aayega
+    const signedIn = await signInWithPhone(phone, password);
     setBusy(false);
-    if (ok) navigate('/');
+    if (signedIn) navigate('/');
   }
 
   async function handleForgot() {
@@ -212,13 +214,13 @@ export default function AuthPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (mode === 'signin_email')    return handleSigninEmail();
-    if (mode === 'signin_phone')    return handleSigninPhone();
-    if (mode === 'signup_email')    return handleSignupEmail();
-    if (mode === 'signup_phone')    return handleSignupPhone();
+    if (mode === 'signin_email')     return handleSigninEmail();
+    if (mode === 'signin_phone')     return handleSigninPhone();
+    if (mode === 'signup_email')     return handleSignupEmail();
+    if (mode === 'signup_phone')     return handleSignupPhone();
     if (mode === 'signup_phone_otp') return handlePhoneOtpVerify();
-    if (mode === 'forgot')          return handleForgot();
-    if (mode === 'reset')           return handleReset();
+    if (mode === 'forgot')           return handleForgot();
+    if (mode === 'reset')            return handleReset();
   }
 
   // ── Go to phone mode (clear fields) ───────────────────────────────────────

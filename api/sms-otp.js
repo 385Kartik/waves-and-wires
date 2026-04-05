@@ -1,4 +1,3 @@
-
 // 2Factor session_id phone_otps table mein store hota hai (otp column mein)
 
 import { createClient } from '@supabase/supabase-js';
@@ -58,7 +57,7 @@ export default async function handler(req, res) {
       const { error: insertErr } = await supabase
         .from('phone_otps')
         .insert({
-          phone,
+          phone:      formatted,
           otp:        sessionId,  // session_id otp column mein store
           expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
         });
@@ -104,7 +103,20 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Invalid OTP. Try again.' });
       }
 
+      // OTP mark as used
       await supabase.from('phone_otps').update({ used: true }).eq('id', record.id);
+
+      // ✅ Phone user ki internal email confirm karo (Supabase auth bypass)
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('phone', formatted)
+        .maybeSingle();
+
+      if (profile?.id) {
+        await supabase.auth.admin.updateUserById(profile.id, { email_confirm: true });
+        console.log(`[SMS OTP] Email confirmed for user ${profile.id}`);
+      }
 
       return res.status(200).json({ success: true });
     } catch (err) {

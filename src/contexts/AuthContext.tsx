@@ -127,29 +127,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   // ─── signUpWithPhone ───────────────────────────────────────────────────────
-  // Internal email se Supabase auth account banao.
-  // Profile trigger (handle_new_user) automatically profile create karta hai.
-  // Explicit upsert NAHI karte — 401 aata tha kyunki user tab logged in nahi hota.
+  // Sirf account banata hai — signin OTP verify ke BAAD hoga (AuthPage handle karta hai)
   async function signUpWithPhone(phone: string, password: string, fullName: string) {
     const formatted     = normalisePhone(phone);
     const internalEmail = phoneToInternalEmail(formatted);
 
-    // FIX: .single() → .maybeSingle() — 406 error fix
     const { data: existing } = await supabase
       .from('profiles')
       .select('id')
       .eq('phone', formatted)
-      .maybeSingle();                          // ← yeh fix hai
+      .maybeSingle();
 
     if (existing) return { success: false, error: 'phone_exists' };
 
     const { data, error } = await supabase.auth.signUp({
       email:    internalEmail,
       password,
-      options:  {
+      options: {
         data: { full_name: fullName, phone: formatted },
-        // email confirmation OFF hai Supabase dashboard pe
-        // isliye emailRedirectTo ki zaroorat nahi
       },
     });
 
@@ -162,9 +157,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (data.user && (!data.user.identities || data.user.identities.length === 0))
       return { success: false, error: 'phone_exists' };
 
-    // ✅ Profile trigger handle karta hai — explicit upsert NAHI karo
-    // handle_new_user trigger → full_name, phone, email auto-save hota hai
-
+    // ✅ Signin yahan NAHI hoga — OTP verify ke baad AuthPage mein hoga
     return { success: true };
   }
 
@@ -262,7 +255,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       const data = await res.json();
       if (!res.ok || !data.success) { toast.error(data.error || 'Could not send OTP'); return false; }
-      toast.success('OTP sent via SMS!');
+      toast.success('OTP sent!');
       return true;
     } catch { toast.error('OTP service unavailable'); return false; }
   }
@@ -278,6 +271,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!res.ok || !data.success) { toast.error(data.error || 'Invalid OTP'); return false; }
 
       if (user) {
+        // Logged-in user ka phone verify karo (AccountPage flow)
         await supabase.from('profiles')
           .update({ phone: formatted, phone_verified: true })
           .eq('id', user.id);
