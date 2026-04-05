@@ -296,11 +296,11 @@ export default function AccountPage() {
                 {/* Phone verification action */}
                 {!user.phone_verified && !phoneVerifying && (
                   <div className="rounded-xl bg-amber-50 border border-amber-200 px-3 py-3 space-y-2">
-                    <p className="text-xs text-amber-700">Verify your phone via WhatsApp OTP to enable phone login and place orders.</p>
+                    <p className="text-xs text-amber-700">Verify your phone via SMS OTP to enable phone login and place orders.</p>
                     <button onClick={() => handleStartPhoneVerify()} disabled={phoneVerifyBusy}
                       className="flex items-center gap-1.5 text-xs font-bold text-amber-700 hover:text-amber-900 disabled:opacity-60">
                       <Phone className={`h-3.5 w-3.5 ${phoneVerifyBusy ? 'animate-pulse' : ''}`} />
-                      {phoneVerifyBusy ? 'Sending OTP…' : 'Send WhatsApp OTP to Verify'}
+                      {phoneVerifyBusy ? 'Sending OTP…' : 'Send SMS OTP to Verify'}
                     </button>
                   </div>
                 )}
@@ -308,7 +308,7 @@ export default function AccountPage() {
                 {/* OTP input */}
                 {!user.phone_verified && phoneVerifying && (
                   <div className="rounded-xl bg-green-50 border border-green-200 px-3 py-3 space-y-3">
-                    <p className="text-xs text-green-700 font-semibold">📱 Check WhatsApp on {user.phone}</p>
+                    <p className="text-xs text-green-700 font-semibold">📱 Check SMS on {user.phone}</p>
                     <input type="text" inputMode="numeric" maxLength={6} autoFocus
                       value={phoneVerifyOtp} onChange={e => setPhoneVerifyOtp(e.target.value.replace(/\D/g, ''))}
                       placeholder="Enter 6-digit OTP"
@@ -347,7 +347,7 @@ export default function AccountPage() {
                     <div className="flex gap-2">
                       <button onClick={handleAddPhone} disabled={phoneBusy}
                         className="flex-1 flex items-center justify-center gap-1 rounded-lg bg-primary text-primary-foreground text-xs font-bold py-2 hover:bg-primary/90 disabled:opacity-50">
-                        <Phone className="h-3.5 w-3.5" />{phoneBusy ? 'Saving…' : 'Save & Send WhatsApp OTP'}
+                        <Phone className="h-3.5 w-3.5" />{phoneBusy ? 'Saving…' : 'Save & Send SMS OTP'}
                       </button>
                       <button onClick={() => { setAddingPhone(false); setNewPhone(''); }}
                         className="px-3 py-2 rounded-lg bg-secondary text-xs text-muted-foreground hover:bg-accent">Cancel</button>
@@ -358,7 +358,7 @@ export default function AccountPage() {
                 {/* OTP input after adding phone */}
                 {phoneVerifying && (
                   <div className="rounded-xl bg-green-50 border border-green-200 px-3 py-3 space-y-3">
-                    <p className="text-xs text-green-700 font-semibold">📱 Check WhatsApp on +91 {newPhone || user.phone}</p>
+                    <p className="text-xs text-green-700 font-semibold">📱 Check SMS on +91 {newPhone || user.phone}</p>
                     <input type="text" inputMode="numeric" maxLength={6} autoFocus
                       value={phoneVerifyOtp} onChange={e => setPhoneVerifyOtp(e.target.value.replace(/\D/g, ''))}
                       placeholder="Enter 6-digit OTP"

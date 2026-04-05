@@ -8,10 +8,8 @@ import { toast } from 'sonner';
 import { sendEmail, orderConfirmHtml } from '@/lib/email';
 import { sendSms, orderConfirmSms } from '@/lib/sms';
 
-declare global { interface Window { Razorpay: any; } }
-
 type Step = 'address' | 'payment' | 'confirm';
-type PayMethod = 'cod' | 'razorpay';
+type PayMethod = 'cod' | 'phonepe';   // razorpay → phonepe
 
 const STATES = ['Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh','Goa','Gujarat','Haryana','Himachal Pradesh','Jharkhand','Karnataka','Kerala','Madhya Pradesh','Maharashtra','Manipur','Meghalaya','Mizoram','Nagaland','Odisha','Punjab','Rajasthan','Sikkim','Tamil Nadu','Telangana','Tripura','Uttar Pradesh','Uttarakhand','West Bengal','Delhi','Jammu & Kashmir','Ladakh','Puducherry','Chandigarh'];
 
@@ -90,148 +88,118 @@ export default function CheckoutPage() {
     return result.order_number!;
   }
 
-  // ─── AUTO PUSH TO SHIPROCKET FUNCTION ─────────────────────────────────
-  // ─── AUTO PUSH TO SHIPROCKET ────────────────────────────────────────────────
-async function autoPushToShiprocket(orderNum: string) {
-  try {
-    const payload = {
-      order_id:       orderNum,
-      order_date:     new Date().toISOString().split('T')[0],
-      pickup_location: 'Primary',
-      billing_customer_name: address.full_name,
-      billing_last_name:     '',
-      billing_address:       address.address_line_1,
-      billing_address_2:     address.address_line_2 || '',
-      billing_city:          address.city,
-      billing_pincode:       address.postal_code,
-      billing_state:         address.state,
-      billing_country:       'India',
-      billing_email:         user?.email || 'customer@wavesandwires.in',
-      billing_phone:         address.phone,
-      shipping_is_billing:   true,
-      order_items: items.map(item => ({
-        name:          item.product.name,
-        sku:           item.product.sku || 'SKU-001',
-        units:         item.quantity,
-        selling_price: item.product.price,
-        discount: '', tax: '', hsn: '',
-      })),
-      payment_method: payMethod === 'cod' ? 'COD' : 'Prepaid',
-      sub_total:  subtotal,
-      length: 10, breadth: 10, height: 10, weight: 0.5,
-    };
-
-    const res  = await fetch('/api/shiprocket', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ action: 'create_order', payload }),
-    });
-    const srData = await res.json();
-
-    if (srData.order_id) {
-      await supabase.from('orders').update({
-        shiprocket_order_id:     String(srData.order_id),
-        shiprocket_shipment_id:  srData.shipment_id ? String(srData.shipment_id) : null,
-        awb_code:                srData.awb_code    || null,
-        courier_name:            srData.courier_name || null,
-        status:                  'confirmed',
-      }).eq('order_number', orderNum);
-    } else {
-      // SR push fail — order DB mein pending rahega, admin panel mein dikhega
-      console.error('[AutoPush] Shiprocket order creation failed:', srData);
+  async function autoPushToShiprocket(orderNum: string) {
+    try {
+      const payload = {
+        order_id:       orderNum,
+        order_date:     new Date().toISOString().split('T')[0],
+        pickup_location: 'Primary',
+        billing_customer_name: address.full_name,
+        billing_last_name:     '',
+        billing_address:       address.address_line_1,
+        billing_address_2:     address.address_line_2 || '',
+        billing_city:          address.city,
+        billing_pincode:       address.postal_code,
+        billing_state:         address.state,
+        billing_country:       'India',
+        billing_email:         user?.email || 'customer@wavesandwires.in',
+        billing_phone:         address.phone,
+        shipping_is_billing:   true,
+        order_items: items.map(item => ({
+          name:          item.product.name,
+          sku:           item.product.sku || 'SKU-001',
+          units:         item.quantity,
+          selling_price: item.product.price,
+          discount: '', tax: '', hsn: '',
+        })),
+        payment_method: payMethod === 'cod' ? 'COD' : 'Prepaid',
+        sub_total:  subtotal,
+        length: 10, breadth: 10, height: 10, weight: 0.5,
+      };
+      const res    = await fetch('/api/shiprocket', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ action: 'create_order', payload }),
+      });
+      const srData = await res.json();
+      if (srData.order_id) {
+        await supabase.from('orders').update({
+          shiprocket_order_id:    String(srData.order_id),
+          shiprocket_shipment_id: srData.shipment_id ? String(srData.shipment_id) : null,
+          awb_code:               srData.awb_code    || null,
+          courier_name:           srData.courier_name || null,
+          status:                 'confirmed',
+        }).eq('order_number', orderNum);
+      }
+    } catch (err) {
+      console.error('[AutoPush] Shiprocket push exception:', err);
     }
-  } catch (err) {
-    // Silent fail — user ko order success dikh jaata hai,
-    // admin panel se manually push kar sakte hain
-    console.error('[AutoPush] Shiprocket push exception:', err);
   }
-}
-// ────────────────────────────────────────────────────────────────────────────
-  
 
+  // ── COD ──────────────────────────────────────────────────────────────────
   async function placeCOD() {
     if (!user) { toast.error('Sign in first'); navigate('/auth'); return; }
+    if (!user.email_verified || !user.phone_verified) {
+      toast.error('Please verify both email and phone before placing orders.');
+      navigate('/account');
+      return;
+    }
     setPlacing(true);
-// Checkout ke start mein:
-if (!user.email_verified || !user.phone_verified) {
-  toast.error('Please verify both email and phone before placing orders.');
-  navigate('/account');
-  return;
-}
     try {
       const orderNum = await saveOrder('cod', 'pending');
-      
-      // Order DB me save hote hi Shiprocket ko bhej do
       await autoPushToShiprocket(orderNum);
-
       clearCart();
       toast.success('Order placed! Pay on delivery.');
       sendEmail(user.email, `Order Confirmed — ${orderNum}`,
         orderConfirmHtml({ name: address.full_name, orderNum, items, subtotal, discount, shipping, tax, total, paymentMethod: 'cod' }));
-        if (user.phone) sendSms(user.phone, orderConfirmSms(orderNum, total, user.full_name));
+      if (user.phone) sendSms(user.phone, orderConfirmSms(orderNum, total, user.full_name));
       navigate(`/order-tracking?order=${orderNum}`);
     } catch (err: any) {
       toast.error(err.message ?? 'Failed to place order');
     } finally { setPlacing(false); }
   }
 
-  async function placeRazorpay() {
+  // ── PHONEPE ───────────────────────────────────────────────────────────────
+  async function placePhonePe() {
     if (!user) { toast.error('Sign in first'); navigate('/auth'); return; }
+    if (!user.email_verified || !user.phone_verified) {
+      toast.error('Please verify both email and phone before placing orders.');
+      navigate('/account');
+      return;
+    }
     setPlacing(true);
-
-// Checkout ke start mein:
-if (!user.email_verified || !user.phone_verified) {
-  toast.error('Please verify both email and phone before placing orders.');
-  navigate('/account');
-  return;
-}
     try {
-      const loaded = await new Promise<boolean>(resolve => {
-        if (window.Razorpay) { resolve(true); return; }
-        const s = document.createElement('script');
-        s.src = 'https://checkout.razorpay.com/v1/checkout.js';
-        s.onload  = () => resolve(true);
-        s.onerror = () => resolve(false);
-        document.head.appendChild(s);
-      });
-      if (!loaded) { toast.error('Could not load Razorpay.'); setPlacing(false); return; }
+      // 1. Order DB mein save karo (payment_pending)
+      const orderNum = await saveOrder('phonepe', 'pending');
 
-      const keyId = import.meta.env.VITE_RAZORPAY_KEY_ID;
-      if (!keyId) { toast.error('Razorpay key not configured.'); setPlacing(false); return; }
+      // 2. Shiprocket ko push karo (async — wait nahi)
+      autoPushToShiprocket(orderNum);
 
-      await new Promise<void>((resolve) => {
-        const rzp = new window.Razorpay({
-          key: keyId, amount: total * 100, currency: 'INR',
-          name: 'Waves & Wires',
-          description: `Order — ${items.length} item${items.length > 1 ? 's' : ''}`,
-          prefill: { name: address.full_name, contact: address.phone, email: user.email },
-          theme: { color: '#f5c018' },
-          handler: async (response: { razorpay_payment_id: string }) => {
-            try {
-              const orderNum = await saveOrder('razorpay', 'paid', response.razorpay_payment_id);
-              
-              // Payment success aur DB me save hote hi Shiprocket bhej do
-              await autoPushToShiprocket(orderNum);
-
-              clearCart();
-              toast.success('Payment successful! Order confirmed.');
-              sendEmail(user.email, `Payment Confirmed — ${orderNum}`,
-                orderConfirmHtml({ name: address.full_name, orderNum, items, subtotal, discount, shipping, tax, total, paymentMethod: 'razorpay' }));
-              navigate(`/order-tracking?order=${orderNum}`);
-            } catch (err: any) {
-              toast.error('Payment done but order save failed. Contact support with payment ID: ' + response.razorpay_payment_id);
-            } finally { resolve(); }
+      // 3. PhonePe payment initiate karo
+      const res = await fetch('/api/phonepe', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action:  'initiate',
+          payload: {
+            amount:      total,
+            orderNumber: orderNum,
+            phone:       address.phone,
           },
-          modal: { ondismiss: () => { toast.info('Payment cancelled'); resolve(); } },
-        });
-        rzp.on('payment.failed', (r: any) => {
-          toast.error('Payment failed: ' + (r.error?.description ?? 'Unknown error'));
-          resolve();
-        });
-        rzp.open();
+        }),
       });
-    } catch { /* handled above */ }
-    finally { setPlacing(false); }
+      const data = await res.json();
+
+      if (data.success && data.redirectUrl) {
+        clearCart();
+        // PhonePe payment page pe redirect
+        window.location.href = data.redirectUrl;
+      } else {
+        toast.error(data.error || 'PhonePe initiation failed. Please try again.');
+      }
+    } catch (err: any) {
+      toast.error(err.message ?? 'Payment initiation failed');
+    } finally { setPlacing(false); }
   }
 
   if (items.length === 0) {
@@ -329,6 +297,8 @@ if (!user.email_verified || !user.phone_verified) {
             <div className="rounded-2xl border border-border bg-card p-4 sm:p-6">
               <h2 className="font-bold text-foreground mb-4 sm:mb-5">Payment Method</h2>
               <div className="space-y-3">
+
+                {/* COD */}
                 <label className={`flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-xl border-2 cursor-pointer transition-all ${payMethod==='cod'?'border-primary bg-primary/5':'border-border hover:border-primary/40'}`}>
                   <input type="radio" name="pay" value="cod" checked={payMethod==='cod'} onChange={()=>setPayMethod('cod')} className="accent-primary" />
                   <div className="flex items-center gap-2 sm:gap-3 flex-1">
@@ -337,16 +307,21 @@ if (!user.email_verified || !user.phone_verified) {
                   </div>
                   <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full shrink-0">FREE</span>
                 </label>
-                <label className={`flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-xl border-2 cursor-pointer transition-all ${payMethod==='razorpay'?'border-primary bg-primary/5':'border-border hover:border-primary/40'}`}>
-                  <input type="radio" name="pay" value="razorpay" checked={payMethod==='razorpay'} onChange={()=>setPayMethod('razorpay')} className="accent-primary" />
+
+                {/* PhonePe */}
+                <label className={`flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-xl border-2 cursor-pointer transition-all ${payMethod==='phonepe'?'border-primary bg-primary/5':'border-border hover:border-primary/40'}`}>
+                  <input type="radio" name="pay" value="phonepe" checked={payMethod==='phonepe'} onChange={()=>setPayMethod('phonepe')} className="accent-primary" />
                   <div className="flex items-center gap-2 sm:gap-3 flex-1">
-                    <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-blue-100 flex items-center justify-center shrink-0"><CreditCard className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" /></div>
-                    <div><p className="font-bold text-foreground text-sm">Pay Online</p><p className="text-xs text-muted-foreground">UPI, Card, Net Banking</p></div>
+                    <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-purple-100 flex items-center justify-center shrink-0">
+                      <span className="text-purple-700 font-black text-[10px] leading-none">₹Pe</span>
+                    </div>
+                    <div><p className="font-bold text-foreground text-sm">Pay via PhonePe</p><p className="text-xs text-muted-foreground">UPI, Card, Net Banking, Wallet</p></div>
                   </div>
-                  <div className="hidden sm:flex gap-1">{['UPI','CARD','NB'].map(l=><span key={l} className="text-[9px] font-bold bg-blue-50 text-blue-600 border border-blue-200 px-1.5 py-0.5 rounded">{l}</span>)}</div>
+                  <div className="hidden sm:flex gap-1">{['UPI','CARD','NB'].map(l=><span key={l} className="text-[9px] font-bold bg-purple-50 text-purple-600 border border-purple-200 px-1.5 py-0.5 rounded">{l}</span>)}</div>
                 </label>
               </div>
 
+              {/* Coupon */}
               <div className="mt-4 sm:mt-5 pt-4 sm:pt-5 border-t border-border">
                 <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2.5">Have a coupon?</p>
                 {couponApplied ? (
@@ -403,7 +378,9 @@ if (!user.email_verified || !user.phone_verified) {
               <div className="rounded-xl bg-secondary/50 border border-border p-4 flex items-center justify-between">
                 <div>
                   <p className="text-[10px] font-black text-muted-foreground uppercase tracking-wider mb-1">Payment</p>
-                  <p className="font-bold text-foreground text-sm">{payMethod==='cod'?'💵 Cash on Delivery':'💳 Online (Razorpay)'}</p>
+                  <p className="font-bold text-foreground text-sm">
+                    {payMethod==='cod' ? '💵 Cash on Delivery' : '📱 PhonePe (UPI / Card)'}
+                  </p>
                 </div>
                 <button onClick={()=>setStep('payment')} className="text-xs text-primary font-bold hover:underline">Change</button>
               </div>
@@ -424,16 +401,23 @@ if (!user.email_verified || !user.phone_verified) {
                 </div>
               </div>
 
+              {payMethod === 'phonepe' && (
+                <div className="rounded-xl bg-purple-50 border border-purple-200 px-4 py-3 text-xs text-purple-700">
+                  📱 You'll be redirected to PhonePe to complete payment. Please don't close the browser.
+                </div>
+              )}
+
               <div className="flex gap-3 pt-1">
                 <button onClick={()=>setStep('payment')} className="rounded-xl border border-border px-4 sm:px-5 py-2.5 text-sm font-semibold text-muted-foreground hover:bg-secondary transition-all">Back</button>
-                <button onClick={payMethod==='cod' ? placeCOD : placeRazorpay}
+                <button
+                  onClick={payMethod==='cod' ? placeCOD : placePhonePe}
                   disabled={placing || !user}
                   className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-black text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-all shadow-md shadow-primary/20">
                   {placing
                     ? <><span className="h-4 w-4 rounded-full border-2 border-black/20 border-t-black animate-spin" />Processing…</>
                     : payMethod==='cod'
                       ? <><Truck className="h-4 w-4" />Confirm Order (COD)</>
-                      : <><CreditCard className="h-4 w-4" />Pay ₹{total.toLocaleString('en-IN')}</>
+                      : <><CreditCard className="h-4 w-4" />Pay ₹{total.toLocaleString('en-IN')} via PhonePe</>
                   }
                 </button>
               </div>

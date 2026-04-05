@@ -25,6 +25,8 @@ import AboutPage from '@/pages/AboutPage';
 import BlogPage from '@/pages/BlogPage';
 import CareersPage from '@/pages/CareersPage';
 import ScrollToTop from '@/components/ScrollToTop';
+import PaymentCallback from '@/pages/PaymentCallback';
+
 
 const queryClient = new QueryClient();
 
@@ -48,6 +50,7 @@ const App = () => (
                   <Route path="/contact" element={<ContactPage />} />
                   <Route path="/wishlist" element={<WishlistPage />} />
                   <Route path="/account" element={<AccountPage />} />
+                  <Route path="/payment-callback" element={<PaymentCallback />} />
                   {/* Policy pages */}
                   <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
                   <Route path="/terms-of-service" element={<TermsOfServicePage />} />

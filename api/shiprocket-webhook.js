@@ -1,9 +1,5 @@
 // api/shiprocket-webhook.js
-// ─────────────────────────────────────────────────────────────────────────────
-// FIX: Expanded status mapping — Shiprocket sends many different status strings
-// FIX: Always respond 200 so SR doesn't retry-loop
-// Added: WhatsApp notification on delivery (via Galla Box)
-// ─────────────────────────────────────────────────────────────────────────────
+// GallaBox WhatsApp delivery notification REMOVED — sirf email rehta hai
 
 import { createClient } from '@supabase/supabase-js';
 import nodemailer        from 'nodemailer';
@@ -13,35 +9,21 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-// ─── EXPANDED status mapping ──────────────────────────────────────────────────
-// Source: Shiprocket webhook docs + common strings observed in production
 function mapSrStatus(srStatus = '') {
   const s = srStatus.toUpperCase().trim().replace(/-/g, ' ');
-
-  // → confirmed
   if (['NEW', 'INVOICED', 'READY TO SHIP', 'PICKUP GENERATED', 'LABEL GENERATED',
        'MANIFEST GENERATED', 'PICKUP SCHEDULED'].includes(s))                         return 'confirmed';
-
-  // → processing
   if (['PICKUP QUEUED', 'PICKUP ERROR', 'PICKUP RESCHEDULED', 'MANIFESTED',
        'SELF FULFILLED'].includes(s))                                                  return 'processing';
-
-  // → shipped
   if (s.includes('SHIPPED') || s.includes('IN TRANSIT') || s.includes('DISPATCHED') ||
       s.includes('OUT FOR DELIVERY') || s.includes('REACHED DESTINATION') ||
       s.includes('REACHED CITY') || s.includes('MISROUTED') ||
       ['PACKET ARRIVED AT GATEWAY', 'PACKET DEPARTED FROM GATEWAY'].includes(s))      return 'shipped';
-
-  // → delivered
   if (s === 'DELIVERED' || s === 'DELIVERY DONE')                                     return 'delivered';
-
-  // → cancelled (RTO = return to origin = cancelled for customer)
   if (s.includes('CANCEL') || s.includes('RTO') || s === 'LOST')                     return 'cancelled';
-
-  return null; // Unknown status — don't update
+  return null;
 }
 
-// ─── Nodemailer ───────────────────────────────────────────────────────────────
 function makeTransporter() {
   return nodemailer.createTransport({
     host:   process.env.SMTP_HOST,
@@ -51,7 +33,6 @@ function makeTransporter() {
   });
 }
 
-// ─── Delivery email ───────────────────────────────────────────────────────────
 function deliveryEmailHtml(name, orderNum, total) {
   const INR      = (n) => `₹${n.toLocaleString('en-IN')}`;
   const SITE_URL = process.env.SITE_URL || 'https://wavesandwires.in';
@@ -106,48 +87,12 @@ async function sendDeliveryEmail(toEmail, name, orderNum, total) {
   }
 }
 
-// ─── WhatsApp delivery notification via Galla Box ────────────────────────────
-async function sendDeliveryWhatsApp(phone, name, orderNum) {
-  try {
-    const apiKey    = process.env.GALLABOX_API_KEY;
-    const apiSecret = process.env.GALLABOX_API_SECRET;
-    const channelId = process.env.GALLABOX_CHANNEL_ID;
-    if (!apiKey || !apiSecret || !channelId) return;
-
-    const digits = phone.replace(/\D/g, '');
-    const phoneForGalla = digits.startsWith('+') ? digits.replace('+', '') : digits;
-
-    await fetch('https://server.gallabox.com/devapi/messages/whatsapp', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json', apikey: apiKey, apiSecret },
-      body: JSON.stringify({
-        channelId,
-        channelType: 'whatsapp',
-        recipient: { name: name.split(' ')[0], phone: phoneForGalla },
-        whatsapp: {
-          type: 'template',
-          template: {
-            // Use a separate "delivery_notification" template, OR use free-form text
-            // if within 24hr customer service window
-            templateName: process.env.GALLABOX_DELIVERY_TEMPLATE || 'order_delivered',
-            bodyValues: { '1': orderNum, '2': name.split(' ')[0] },
-          },
-        },
-      }),
-    });
-  } catch (err) {
-    console.error('[Webhook] WhatsApp delivery notification failed:', err.message);
-  }
-}
-
-// ─── Main handler ─────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
     const data = req.body;
 
-    // Shiprocket handshake / connectivity test
     if (!data || !data.order_id) {
       return res.status(200).json({ status: 'ok', message: 'Webhook active' });
     }
@@ -155,15 +100,14 @@ export default async function handler(req, res) {
     const srOrderId = String(data.order_id);
     const newStatus = mapSrStatus(data.current_status);
 
-    console.log(`[Webhook] SR order ${srOrderId} | Raw status: "${data.current_status}" → Mapped: "${newStatus ?? 'unchanged'}"`);
+    console.log(`[Webhook] SR order ${srOrderId} | Raw: "${data.current_status}" → Mapped: "${newStatus ?? 'unchanged'}"`);
 
-    // Build update object
     const update = { updated_at: new Date().toISOString() };
-    if (newStatus)         update.status                   = newStatus;
-    if (data.awb)          update.awb_code                 = String(data.awb);
-    if (data.courier_name) update.courier_name             = data.courier_name;
-    if (data.shipment_id)  update.shiprocket_shipment_id   = String(data.shipment_id);
-    if (data.current_status) update.shiprocket_status      = data.current_status; // raw SR status
+    if (newStatus)           update.status                 = newStatus;
+    if (data.awb)            update.awb_code               = String(data.awb);
+    if (data.courier_name)   update.courier_name           = data.courier_name;
+    if (data.shipment_id)    update.shiprocket_shipment_id = String(data.shipment_id);
+    if (data.current_status) update.shiprocket_status      = data.current_status;
 
     const { data: updatedOrder, error } = await supabase
       .from('orders')
@@ -173,34 +117,27 @@ export default async function handler(req, res) {
       .single();
 
     if (error) {
-      // Don't throw — Shiprocket might send webhooks before order is in DB
-      console.warn('[Webhook] Order not found in DB for SR ID:', srOrderId, error.message);
+      console.warn('[Webhook] Order not found for SR ID:', srOrderId, error.message);
       return res.status(200).json({ status: 'ok', note: 'order not found' });
     }
 
-    // ── Delivery notifications ────────────────────────────────────────────
+    // Delivery email only (GallaBox WhatsApp removed)
     if (newStatus === 'delivered' && updatedOrder?.user_id) {
       const { data: profile } = await supabase
         .from('profiles')
-        .select('email, phone, full_name')
+        .select('email, full_name')
         .eq('id', updatedOrder.user_id)
         .single();
 
-      const customerName = updatedOrder.shipping_address?.full_name
-        ?? profile?.full_name
-        ?? 'Customer';
+      const customerName = updatedOrder.shipping_address?.full_name ?? profile?.full_name ?? 'Customer';
 
       if (profile?.email) {
         sendDeliveryEmail(profile.email, customerName, updatedOrder.order_number, updatedOrder.total);
-      }
-      if (profile?.phone) {
-        sendDeliveryWhatsApp(profile.phone, customerName, updatedOrder.order_number);
       }
     }
 
     return res.status(200).json({ success: true });
   } catch (err) {
-    // Always 200 so Shiprocket doesn't retry-loop
     console.error('[Webhook Error]', err.message);
     return res.status(200).json({ error: err.message });
   }

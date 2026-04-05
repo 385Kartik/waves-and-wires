@@ -254,42 +254,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return true;
   }
 
-  // ─── WhatsApp OTP via Galla Box ───────────────────────────────────────────
+  // ─── WhatsApp OTP via Galla Box is changed to sms, but because i have to change everything in function, i changed the api endpoint. Same with verifucation ───────────────────────────────────────────
   async function sendWhatsAppOtp(phone: string): Promise<boolean> {
-    const formatted = normalisePhone(phone);
-    try {
-      const res  = await fetch('/api/whatsapp-otp', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'send', phone: formatted }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) { toast.error(data.error || 'Could not send OTP'); return false; }
-      toast.success('OTP sent to your WhatsApp!');
-      return true;
-    } catch { toast.error('OTP service unavailable'); return false; }
-  }
+  const formatted = normalisePhone(phone);
+  try {
+    const res = await fetch('/api/sms-otp', {  
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'send', phone: formatted }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) { toast.error(data.error || 'Could not send OTP'); return false; }
+    toast.success('OTP sent via SMS!');  
+    return true;
+  } catch { toast.error('OTP service unavailable'); return false; }
+}
 
   async function verifyWhatsAppOtp(phone: string, otp: string): Promise<boolean> {
-    const formatted = normalisePhone(phone);
-    try {
-      const res  = await fetch('/api/whatsapp-otp', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'verify', phone: formatted, otp: otp.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) { toast.error(data.error || 'Invalid OTP'); return false; }
-
-      // profiles mein phone_verified = true
-      if (user) {
-        await supabase.from('profiles')
-          .update({ phone: formatted, phone_verified: true })
-          .eq('id', user.id);
-        setUser(prev => prev ? { ...prev, phone: formatted, phone_verified: true } : prev);
-      }
-      toast.success('Phone verified! ✓');
-      return true;
-    } catch { toast.error('Verification failed'); return false; }
-  }
+  const formatted = normalisePhone(phone);
+  try {
+    const res = await fetch('/api/sms-otp', {   // ← whatsapp-otp → sms-otp
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'verify', phone: formatted, otp: otp.trim() }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) { toast.error(data.error || 'Invalid OTP'); return false; }
+    if (user) {
+      await supabase.from('profiles')
+        .update({ phone: formatted, phone_verified: true })
+        .eq('id', user.id);
+      setUser(prev => prev ? { ...prev, phone: formatted, phone_verified: true } : prev);
+    }
+    toast.success('Phone verified! ✓');
+    return true;
+  } catch { toast.error('Verification failed'); return false; }
+}
 
   return (
     <AuthContext.Provider value={{

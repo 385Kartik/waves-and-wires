@@ -243,7 +243,7 @@ export default function AuthPage() {
     signin_phone:    'Enter your phone number and password',
     signup_email:    'Sign up with your email address',
     signup_phone:    'Sign up with your mobile number',
-    signup_phone_otp:`OTP sent to +91 ${phone} on WhatsApp`,
+    signup_phone_otp:`OTP sent to +91 ${phone} via SMS`,
     forgot:          "We'll send a reset link to your email",
     verify:          `Verification link sent to ${email}`,
     reset:           'Enter your new password below',
@@ -356,7 +356,7 @@ export default function AuthPage() {
                     <div className="flex items-center gap-1.5 rounded-xl border border-border bg-secondary/60 px-3 text-sm font-semibold text-foreground shrink-0">🇮🇳 +91</div>
                     <input type="tel" required inputMode="numeric" maxLength={10} value={phone} onChange={e => { setPhone(e.target.value.replace(/\D/g, '')); clr(); }} placeholder="9876543210" className="flex-1 rounded-xl border border-border bg-secondary/60 py-2.5 px-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" />
                   </div>
-                  <p className="mt-1 text-[11px] text-muted-foreground">OTP will be sent to this number on WhatsApp</p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">OTP will be sent to this number via SMS</p>
                 </div>
                 <div>
                   <label className="label">Password *</label>
@@ -379,7 +379,7 @@ export default function AuthPage() {
               {/* SIGNUP PHONE OTP ─────────────────────────────────── */}
               {mode === 'signup_phone_otp' && <>
                 <div className="rounded-xl bg-green-50 border border-green-200 px-4 py-3 text-xs text-green-700">
-                  📱 Check WhatsApp on +91 {phone} for your 6-digit OTP
+                   📱 Check SMS on +91 {phone} for your 6-digit OTP
                 </div>
                 <div>
                   <label className="label">Enter OTP *</label>
