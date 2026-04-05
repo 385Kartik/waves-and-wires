@@ -1,83 +1,249 @@
-import { Shield } from 'lucide-react';
+// src/pages/PaymentCallback.tsx
+// PhonePe yahan redirect karta hai payment ke baad
+// URL: /payment-callback?order=WW-XXXX
 
-const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
-  <div className="space-y-3">
-    <h2 className="text-base font-bold text-foreground">{title}</h2>
-    <div className="text-sm text-muted-foreground leading-relaxed space-y-2">{children}</div>
-  </div>
-);
+import { useEffect, useState } from 'react';
+import { useSearchParams, useNavigate, Link } from 'react-router-dom';
+import { CheckCircle, XCircle, Clock, Loader2, ArrowRight, ShoppingBag } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
+import { sendEmail, orderConfirmHtml } from '@/lib/email';
+import { sendSms, orderConfirmSms } from '@/lib/sms';
 
-export default function PrivacyPolicyPage() {
-  return (
-    <div className="container py-12 max-w-3xl">
-      <div className="flex items-center gap-3 mb-8">
-        <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-          <Shield className="h-5 w-5 text-primary" />
+type Status = 'loading' | 'success' | 'failed' | 'pending';
+
+export default function PaymentCallback() {
+  const [searchParams]    = useSearchParams();
+  const navigate          = useNavigate();
+  const { user }          = useAuth();
+  const [status, setStatus] = useState<Status>('loading');
+  const [orderNum, setOrderNum] = useState('');
+  const [total, setTotal]       = useState(0);
+  const [retries, setRetries]   = useState(0);
+
+  const orderId = searchParams.get('order') ?? searchParams.get('transactionId') ?? '';
+
+  useEffect(() => {
+    if (!orderId) { navigate('/'); return; }
+    setOrderNum(orderId);
+    verifyPayment(orderId);
+  }, [orderId]);
+
+  async function verifyPayment(txnId: string, attempt = 0) {
+    try {
+      // PhonePe se status check karo
+      const res  = await fetch('/api/phonepe', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ action: 'verify', payload: { merchantTransactionId: txnId } }),
+      });
+      const data = await res.json();
+
+      const payStatus = data?.data?.state; // SUCCESS | FAILED | PENDING
+
+      if (payStatus === 'COMPLETED' || data?.code === 'PAYMENT_SUCCESS') {
+        // ✅ Payment successful — DB update karo
+        await supabase
+          .from('orders')
+          .update({
+            payment_status: 'paid',
+            payment_ref:    data?.data?.transactionId ?? txnId,
+            status:         'confirmed',
+          })
+          .eq('order_number', txnId);
+
+        // Email + SMS
+        if (user) {
+          const { data: orderData } = await supabase
+            .from('orders')
+            .select('total, shipping_address, items')
+            .eq('order_number', txnId)
+            .single();
+
+          if (orderData) {
+            setTotal(orderData.total);
+            const addr = orderData.shipping_address;
+            sendEmail(
+              user.email,
+              `Order Confirmed — ${txnId}`,
+              orderConfirmHtml({
+                name: addr?.full_name ?? user.full_name,
+                orderNum: txnId,
+                items: orderData.items ?? [],
+                subtotal: orderData.total,
+                discount: 0,
+                shipping: 0,
+                tax: 0,
+                total: orderData.total,
+                paymentMethod: 'phonepe',
+              })
+            );
+            if (user.phone) sendSms(user.phone, orderConfirmSms(txnId, orderData.total, user.full_name));
+          }
+        }
+
+        setStatus('success');
+
+      } else if (payStatus === 'FAILED' || data?.code === 'PAYMENT_ERROR') {
+        // ❌ Payment failed — DB update karo
+        await supabase
+          .from('orders')
+          .update({ payment_status: 'failed', status: 'cancelled' })
+          .eq('order_number', txnId);
+
+        setStatus('failed');
+
+      } else {
+        // ⏳ Pending — 3 baar retry karo (2s interval)
+        if (attempt < 3) {
+          setRetries(attempt + 1);
+          setTimeout(() => verifyPayment(txnId, attempt + 1), 2000);
+        } else {
+          setStatus('pending');
+        }
+      }
+    } catch (err) {
+      console.error('[PaymentCallback] Verify error:', err);
+      if (attempt < 3) {
+        setTimeout(() => verifyPayment(txnId, attempt + 1), 2000);
+      } else {
+        setStatus('pending');
+      }
+    }
+  }
+
+  // ── UI ───────────────────────────────────────────────────────────────────
+  if (status === 'loading') {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4">
+        <div className="h-16 w-16 rounded-2xl bg-secondary flex items-center justify-center">
+          <Loader2 className="h-8 w-8 text-primary animate-spin" />
         </div>
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Privacy Policy</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">Waves and Wires Technologies LLP</p>
+        <div className="text-center">
+          <p className="font-bold text-foreground">Verifying your payment…</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            {retries > 0 ? `Retrying… (${retries}/3)` : 'Please wait, do not close this page'}
+          </p>
         </div>
       </div>
+    );
+  }
 
-      <div className="rounded-2xl border border-border bg-card p-6 sm:p-8 space-y-8">
+  if (status === 'success') {
+    return (
+      <div className="container max-w-md py-16 flex flex-col items-center text-center gap-6">
+        <div className="h-20 w-20 rounded-full bg-green-100 flex items-center justify-center">
+          <CheckCircle className="h-10 w-10 text-green-600" />
+        </div>
+        <div>
+          <h1 className="text-2xl font-black text-foreground">Payment Successful!</h1>
+          <p className="text-muted-foreground mt-2">Your order has been confirmed.</p>
+          {orderNum && (
+            <p className="mt-3 text-sm font-mono bg-secondary rounded-xl px-4 py-2 inline-block">
+              Order: <span className="font-black text-foreground">{orderNum}</span>
+            </p>
+          )}
+          {total > 0 && (
+            <p className="text-2xl font-black text-primary mt-3">₹{total.toLocaleString('en-IN')}</p>
+          )}
+        </div>
+        <div className="flex gap-3 w-full">
+          <Link
+            to={`/order-tracking?order=${orderNum}`}
+            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-black text-primary-foreground hover:bg-primary/90 transition-all"
+          >
+            Track Order <ArrowRight className="h-4 w-4" />
+          </Link>
+          <Link
+            to="/shop"
+            className="flex items-center justify-center gap-2 rounded-xl border border-border px-4 py-3 text-sm font-semibold text-foreground hover:bg-secondary transition-all"
+          >
+            <ShoppingBag className="h-4 w-4" />
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
-        <Section title="Who We Are">
-          <p>Our website address is: <a href="https://wavesandwires.in" className="text-primary hover:underline">https://wavesandwires.in</a></p>
-          <p>Waves and Wires Technologies LLP is a Mumbai-based company specializing in modern electric appliances.</p>
-        </Section>
+  if (status === 'failed') {
+    return (
+      <div className="container max-w-md py-16 flex flex-col items-center text-center gap-6">
+        <div className="h-20 w-20 rounded-full bg-red-100 flex items-center justify-center">
+          <XCircle className="h-10 w-10 text-red-500" />
+        </div>
+        <div>
+          <h1 className="text-2xl font-black text-foreground">Payment Failed</h1>
+          <p className="text-muted-foreground mt-2">
+            Your payment could not be processed. You have not been charged.
+          </p>
+          {orderNum && (
+            <p className="mt-3 text-sm text-muted-foreground">
+              Reference: <span className="font-mono font-bold">{orderNum}</span>
+            </p>
+          )}
+        </div>
+        <div className="flex gap-3 w-full">
+          <Link
+            to="/checkout"
+            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-black text-primary-foreground hover:bg-primary/90 transition-all"
+          >
+            Try Again
+          </Link>
+          <Link
+            to="/shop"
+            className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-border px-4 py-3 text-sm font-semibold text-foreground hover:bg-secondary transition-all"
+          >
+            Continue Shopping
+          </Link>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Need help?{' '}
+          <a href="mailto:support@wavesandwires.in" className="text-primary hover:underline">
+            Contact Support
+          </a>
+        </p>
+      </div>
+    );
+  }
 
-        <Section title="Comments">
-          <p>When visitors leave comments on the site we collect the data shown in the comments form, and also the visitor's IP address and browser user agent string to help spam detection.</p>
-          <p>An anonymized string created from your email address (also called a hash) may be provided to the Gravatar service to see if you are using it. The Gravatar service privacy policy is available at <a href="https://automattic.com/privacy/" className="text-primary hover:underline" target="_blank" rel="noopener noreferrer">https://automattic.com/privacy/</a>. After approval of your comment, your profile picture is visible to the public in the context of your comment.</p>
-        </Section>
-
-        <Section title="Media">
-          <p>If you upload images to the website, you should avoid uploading images with embedded location data (EXIF GPS) included. Visitors to the website can download and extract any location data from images on the website.</p>
-        </Section>
-
-        <Section title="Cookies">
-          <p>If you leave a comment on our site you may opt-in to saving your name, email address and website in cookies. These are for your convenience so that you do not have to fill in your details again when you leave another comment. These cookies will last for one year.</p>
-          <p>If you visit our login page, we will set a temporary cookie to determine if your browser accepts cookies. This cookie contains no personal data and is discarded when you close your browser.</p>
-          <p>When you log in, we will also set up several cookies to save your login information and your screen display choices. Login cookies last for two days, and screen options cookies last for a year. If you select "Remember Me", your login will persist for two weeks. If you log out of your account, the login cookies will be removed.</p>
-          <p>If you edit or publish an article, an additional cookie will be saved in your browser. This cookie includes no personal data and simply indicates the post ID of the article you just edited. It expires after 1 day.</p>
-        </Section>
-
-        <Section title="Embedded Content from Other Websites">
-          <p>Articles on this site may include embedded content (e.g. videos, images, articles, etc.). Embedded content from other websites behaves in the exact same way as if the visitor has visited the other website.</p>
-          <p>These websites may collect data about you, use cookies, embed additional third-party tracking, and monitor your interaction with that embedded content, including tracking your interaction with the embedded content if you have an account and are logged in to that website.</p>
-        </Section>
-
-        <Section title="Who We Share Your Data With">
-          <p>If you request a password reset, your IP address will be included in the reset email.</p>
-          <ul className="list-disc pl-5 space-y-1">
-            <li><strong className="text-foreground">Delivery partners</strong> — to fulfil your orders (name, address, phone)</li>
-            <li><strong className="text-foreground">Payment processors</strong> — Razorpay processes your payment; we do not store card details</li>
-            <li><strong className="text-foreground">Legal authorities</strong> — when required by law or to protect our rights</li>
-          </ul>
-        </Section>
-
-        <Section title="How Long We Retain Your Data">
-          <p>If you leave a comment, the comment and its metadata are retained indefinitely. This is so we can recognize and approve any follow-up comments automatically instead of holding them in a moderation queue.</p>
-          <p>For users that register on our website, we also store the personal information they provide in their user profile. All users can see, edit, or delete their personal information at any time (except they cannot change their username). Website administrators can also see and edit that information.</p>
-        </Section>
-
-        <Section title="What Rights You Have Over Your Data">
-          <p>If you have an account on this site, or have left comments, you can request to receive an exported file of the personal data we hold about you, including any data you have provided to us. You can also request that we erase any personal data we hold about you. This does not include any data we are obliged to keep for administrative, legal, or security purposes.</p>
-        </Section>
-
-        <Section title="Where We Send Your Data">
-          <p>Visitor comments may be checked through an automated spam detection service.</p>
-        </Section>
-
-        <Section title="Contact Us">
-          <p>If you have any questions about this Privacy Policy, please contact us:</p>
-          <ul className="list-disc pl-5 space-y-1">
-            <li>Email: <a href="mailto:support@wavesandwires.in" className="text-primary hover:underline">support@wavesandwires.in</a></li>
-            <li>Phone: <a href="tel:6009595600" className="text-primary hover:underline">6009595600</a></li>
-            <li>Address: 005, Building No.12, B Wing, Sangeet Complex, Jesal Park, Bhayandar East, Mira Bhayandar, Mumbai – 401105</li>
-          </ul>
-        </Section>
+  // pending
+  return (
+    <div className="container max-w-md py-16 flex flex-col items-center text-center gap-6">
+      <div className="h-20 w-20 rounded-full bg-amber-100 flex items-center justify-center">
+        <Clock className="h-10 w-10 text-amber-600" />
+      </div>
+      <div>
+        <h1 className="text-2xl font-black text-foreground">Payment Pending</h1>
+        <p className="text-muted-foreground mt-2">
+          We're waiting for confirmation from PhonePe. This can take a few minutes.
+        </p>
+        {orderNum && (
+          <p className="mt-3 text-sm font-mono bg-secondary rounded-xl px-4 py-2 inline-block">
+            Order: <span className="font-black text-foreground">{orderNum}</span>
+          </p>
+        )}
+      </div>
+      <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-sm text-amber-700 text-left w-full">
+        <p className="font-bold mb-1">What to do next:</p>
+        <ul className="space-y-1 text-xs list-disc list-inside">
+          <li>Check your UPI app for the transaction status</li>
+          <li>If payment was deducted, it'll be confirmed within 2 hours</li>
+          <li>If not, the amount will be auto-refunded in 5–7 days</li>
+        </ul>
+      </div>
+      <div className="flex gap-3 w-full">
+        <button
+          onClick={() => { setStatus('loading'); verifyPayment(orderNum); }}
+          className="flex-1 rounded-xl border border-border px-6 py-3 text-sm font-bold text-foreground hover:bg-secondary transition-all"
+        >
+          Check Again
+        </button>
+        <Link
+          to={`/order-tracking?order=${orderNum}`}
+          className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-black text-primary-foreground hover:bg-primary/90 transition-all"
+        >
+          Track Order
+        </Link>
       </div>
     </div>
   );
