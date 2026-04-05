@@ -9,8 +9,8 @@ export interface AuthUser {
   id: string; email: string; full_name: string;
   phone?: string; avatar_url?: string;
   email_verified:  boolean;
-  phone_verified:  boolean;  // profiles.phone_verified (WhatsApp OTP ke baad true)
-  is_phone_signup: boolean;  // phone-first signup tha (internal email use hua)
+  phone_verified:  boolean;
+  is_phone_signup: boolean;
   is_admin: boolean; created_at: string;
 }
 
@@ -27,6 +27,9 @@ interface AuthContextType {
   addEmailToAccount:       (email: string) => Promise<boolean>;
   addPhoneToAccount:       (phone: string) => Promise<boolean>;
   resendVerificationEmail: () => Promise<boolean>;
+  sendSmsOtp:              (phone: string) => Promise<boolean>;
+  verifySmsOtp:            (phone: string, otp: string) => Promise<boolean>;
+  // Legacy aliases (AuthPage + AccountPage mein yahi names use ho rahe hain)
   sendWhatsAppOtp:         (phone: string) => Promise<boolean>;
   verifyWhatsAppOtp:       (phone: string, otp: string) => Promise<boolean>;
   refreshUser:             () => Promise<void>;
@@ -34,7 +37,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// ─── Phone helpers ───────────────────────────────────────────────────────────
+// ─── Phone helpers ────────────────────────────────────────────────────────────
 export function normalisePhone(raw: string): string {
   const digits = raw.replace(/\D/g, '');
   if (digits.startsWith('91') && digits.length === 12) return `+${digits}`;
@@ -42,7 +45,6 @@ export function normalisePhone(raw: string): string {
   return `+${digits}`;
 }
 
-// Phone-first signup ka internal hidden email (user kabhi nahi dekhega)
 export function phoneToInternalEmail(phone: string): string {
   const digits = normalisePhone(phone).replace('+', '');
   return `ph_${digits}@ww.internal`;
@@ -65,12 +67,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: profile } = await supabase
       .from('profiles').select('*').eq('id', sess.user.id).single();
 
-    const authEmail  = sess.user.email ?? '';
-    const isPhone    = isInternalEmail(authEmail);
+    const authEmail = sess.user.email ?? '';
+    const isPhone   = isInternalEmail(authEmail);
 
     setUser({
       id:              sess.user.id,
-      // Phone signup users ke liye real email profile se aata hai, internal email nahi dikhega
       email:           isPhone ? (profile?.email ?? '') : authEmail,
       full_name:       profile?.full_name ?? sess.user.user_metadata?.full_name ?? '',
       phone:           profile?.phone ?? undefined,
@@ -103,7 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => { mounted = false; subscription.unsubscribe(); };
   }, []);
 
-  // ─── signUpWithEmail ──────────────────────────────────────────────────────
+  // ─── signUpWithEmail ───────────────────────────────────────────────────────
   async function signUpWithEmail(email: string, password: string, fullName: string) {
     const { data, error } = await supabase.auth.signUp({
       email, password,
@@ -125,22 +126,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { success: true };
   }
 
-  // ─── signUpWithPhone ──────────────────────────────────────────────────────
-  // Supabase phone auth nahi — internal email + password se account banao.
-  // WhatsApp OTP se phone verify hoti hai alag se.
+  // ─── signUpWithPhone ───────────────────────────────────────────────────────
+  // Internal email se Supabase auth account banao.
+  // Profile trigger (handle_new_user) automatically profile create karta hai.
+  // Explicit upsert NAHI karte — 401 aata tha kyunki user tab logged in nahi hota.
   async function signUpWithPhone(phone: string, password: string, fullName: string) {
     const formatted     = normalisePhone(phone);
     const internalEmail = phoneToInternalEmail(formatted);
 
-    // Check: kya phone pehle se registered hai
+    // FIX: .single() → .maybeSingle() — 406 error fix
     const { data: existing } = await supabase
-      .from('profiles').select('id').eq('phone', formatted).single();
+      .from('profiles')
+      .select('id')
+      .eq('phone', formatted)
+      .maybeSingle();                          // ← yeh fix hai
+
     if (existing) return { success: false, error: 'phone_exists' };
 
     const { data, error } = await supabase.auth.signUp({
-      email: internalEmail, password,
-      options: { data: { full_name: fullName, phone: formatted } },
+      email:    internalEmail,
+      password,
+      options:  {
+        data: { full_name: fullName, phone: formatted },
+        // email confirmation OFF hai Supabase dashboard pe
+        // isliye emailRedirectTo ki zaroorat nahi
+      },
     });
+
     if (error) {
       const msg = error.message.toLowerCase();
       if (msg.includes('already registered') || msg.includes('already exists'))
@@ -150,32 +162,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (data.user && (!data.user.identities || data.user.identities.length === 0))
       return { success: false, error: 'phone_exists' };
 
-    // Profile mein phone save karo (email null — baad mein add karenga)
-    await supabase.from('profiles').upsert({
-      id: data.user!.id, full_name: fullName,
-      phone: formatted, email: null, phone_verified: false,
-    }, { onConflict: 'id' });
+    // ✅ Profile trigger handle karta hai — explicit upsert NAHI karo
+    // handle_new_user trigger → full_name, phone, email auto-save hota hai
 
     return { success: true };
   }
 
-  // ─── signInWithEmail ──────────────────────────────────────────────────────
+  // ─── signInWithEmail ───────────────────────────────────────────────────────
   async function signInWithEmail(email: string, password: string) {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) { toast.error(error.message); return false; }
     return true;
   }
 
-  // ─── signInWithPhone ──────────────────────────────────────────────────────
-  // Phone se signup kiya tha → internal email reconstruct → login
+  // ─── signInWithPhone ───────────────────────────────────────────────────────
   async function signInWithPhone(phone: string, password: string) {
     const formatted     = normalisePhone(phone);
     const internalEmail = phoneToInternalEmail(formatted);
-    const { error } = await supabase.auth.signInWithPassword({ email: internalEmail, password });
-    if (error) {
-      toast.error('Incorrect phone number or password');
-      return false;
-    }
+    const { error }     = await supabase.auth.signInWithPassword({ email: internalEmail, password });
+    if (error) { toast.error('Incorrect phone number or password'); return false; }
     return true;
   }
 
@@ -200,31 +205,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return true;
   }
 
-  // ─── addEmailToAccount ────────────────────────────────────────────────────
-  // Phone-signup user real email add kar raha hai.
-  // Profile mein save karo immediately, Supabase auth ko bhi update karo (confirmation email jayegi).
+  // ─── addEmailToAccount ─────────────────────────────────────────────────────
   async function addEmailToAccount(email: string): Promise<boolean> {
     if (!user) return false;
     const cleanEmail = email.trim().toLowerCase();
 
-    // Pehle profiles mein save karo (taaki reload pe gayab na ho)
     await supabase.from('profiles')
       .update({ email: cleanEmail, email_verified: false })
       .eq('id', user.id);
 
-    // Supabase auth mein update karo (confirmation email trigger hogi)
     const { error } = await supabase.auth.updateUser({ email: cleanEmail });
-    if (error) {
-      toast.error(error.message);
-      return false;
-    }
+    if (error) { toast.error(error.message); return false; }
 
     setUser(prev => prev ? { ...prev, email: cleanEmail, email_verified: false } : prev);
     return true;
   }
 
-  // ─── addPhoneToAccount ────────────────────────────────────────────────────
-  // Email-signup user phone add kar raha hai (profiles mein save, verify baad mein)
+  // ─── addPhoneToAccount ─────────────────────────────────────────────────────
   async function addPhoneToAccount(phone: string): Promise<boolean> {
     if (!user) return false;
     const formatted = normalisePhone(phone);
@@ -236,17 +233,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return true;
   }
 
-  // ─── resendVerificationEmail ──────────────────────────────────────────────
+  // ─── resendVerificationEmail ───────────────────────────────────────────────
   async function resendVerificationEmail(): Promise<boolean> {
     if (!user || !session) return false;
     if (user.is_phone_signup && user.email) {
-      // Phone-signup user ke liye email change resend
       const { error } = await supabase.auth.resend({ type: 'email_change', email: user.email });
       if (error) { toast.error(error.message); return false; }
     } else {
       const { error } = await supabase.auth.resend({
         type: 'signup', email: session.user.email!,
-        options: { emailRedirectTo: `${import.meta.env.VITE_SITE_URL ?? window.location.origin}/auth?verified=true` },
+        options: {
+          emailRedirectTo: `${import.meta.env.VITE_SITE_URL ?? window.location.origin}/auth?verified=true`,
+        },
       });
       if (error) { toast.error(error.message); return false; }
     }
@@ -254,40 +252,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return true;
   }
 
-  // ─── WhatsApp OTP via Galla Box is changed to sms, but because i have to change everything in function, i changed the api endpoint. Same with verifucation ───────────────────────────────────────────
-  async function sendWhatsAppOtp(phone: string): Promise<boolean> {
-  const formatted = normalisePhone(phone);
-  try {
-    const res = await fetch('/api/sms-otp', {  
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'send', phone: formatted }),
-    });
-    const data = await res.json();
-    if (!res.ok || !data.success) { toast.error(data.error || 'Could not send OTP'); return false; }
-    toast.success('OTP sent via SMS!');  
-    return true;
-  } catch { toast.error('OTP service unavailable'); return false; }
-}
+  // ─── SMS OTP (2Factor.in) ──────────────────────────────────────────────────
+  async function sendSmsOtp(phone: string): Promise<boolean> {
+    const formatted = normalisePhone(phone);
+    try {
+      const res  = await fetch('/api/sms-otp', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'send', phone: formatted }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) { toast.error(data.error || 'Could not send OTP'); return false; }
+      toast.success('OTP sent via SMS!');
+      return true;
+    } catch { toast.error('OTP service unavailable'); return false; }
+  }
 
-  async function verifyWhatsAppOtp(phone: string, otp: string): Promise<boolean> {
-  const formatted = normalisePhone(phone);
-  try {
-    const res = await fetch('/api/sms-otp', {   // ← whatsapp-otp → sms-otp
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'verify', phone: formatted, otp: otp.trim() }),
-    });
-    const data = await res.json();
-    if (!res.ok || !data.success) { toast.error(data.error || 'Invalid OTP'); return false; }
-    if (user) {
-      await supabase.from('profiles')
-        .update({ phone: formatted, phone_verified: true })
-        .eq('id', user.id);
-      setUser(prev => prev ? { ...prev, phone: formatted, phone_verified: true } : prev);
-    }
-    toast.success('Phone verified! ✓');
-    return true;
-  } catch { toast.error('Verification failed'); return false; }
-}
+  async function verifySmsOtp(phone: string, otp: string): Promise<boolean> {
+    const formatted = normalisePhone(phone);
+    try {
+      const res  = await fetch('/api/sms-otp', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'verify', phone: formatted, otp: otp.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) { toast.error(data.error || 'Invalid OTP'); return false; }
+
+      if (user) {
+        await supabase.from('profiles')
+          .update({ phone: formatted, phone_verified: true })
+          .eq('id', user.id);
+        setUser(prev => prev ? { ...prev, phone: formatted, phone_verified: true } : prev);
+      }
+      toast.success('Phone verified! ✓');
+      return true;
+    } catch { toast.error('Verification failed'); return false; }
+  }
+
+  // Legacy aliases — AuthPage aur AccountPage change nahi karne padte
+  const sendWhatsAppOtp   = sendSmsOtp;
+  const verifyWhatsAppOtp = verifySmsOtp;
 
   return (
     <AuthContext.Provider value={{
@@ -296,7 +299,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signInWithEmail, signInWithPhone,
       signOut, resetPassword, updateProfile,
       addEmailToAccount, addPhoneToAccount,
-      resendVerificationEmail, sendWhatsAppOtp, verifyWhatsAppOtp, refreshUser,
+      resendVerificationEmail,
+      sendSmsOtp, verifySmsOtp,
+      sendWhatsAppOtp, verifyWhatsAppOtp,
+      refreshUser,
     }}>
       {children}
     </AuthContext.Provider>
