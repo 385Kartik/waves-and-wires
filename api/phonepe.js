@@ -24,7 +24,7 @@ export default async function handler(req, res) {
   const merchantId = process.env.PHONEPE_MERCHANT_ID;
   const saltKey    = process.env.PHONEPE_SALT_KEY;
   const saltIndex  = process.env.PHONEPE_SALT_INDEX || '1';
-  const siteUrl    = process.env.SITE_URL || 'https://wavesandwires.in';
+  const siteUrl    = process.env.SITE_URL || 'https://waves-and-wires.vercel.app/';
 
   // ── INITIATE PAYMENT ─────────────────────────────────────────────────────
   if (action === 'initiate') {
