@@ -72,7 +72,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     setUser({
       id:              sess.user.id,
-      email:           isPhone ? (profile?.email ?? '') : authEmail,
+      email: isPhone
+  ? (profile?.email && !profile.email.endsWith('@ww.internal') ? profile.email : '')
+  : authEmail,
       full_name:       profile?.full_name ?? sess.user.user_metadata?.full_name ?? '',
       phone:           profile?.phone ?? undefined,
       avatar_url:      profile?.avatar_url ?? undefined,
