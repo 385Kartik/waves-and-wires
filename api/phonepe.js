@@ -22,21 +22,24 @@ export default async function handler(req, res) {
   const saltIndex  = process.env.PHONEPE_SALT_INDEX || '1';
   const siteUrl    = (process.env.SITE_URL || '').replace(/\/$/, '');
 
-  // ── INITIATE ──────────────────────────────────────────────────────────────
+  // INITIATE
   if (action === 'initiate') {
     const { amount, orderNumber, phone } = payload ?? {};
     if (!amount || !orderNumber) return res.status(400).json({ error: 'amount and orderNumber required' });
 
+    // FIX: har attempt ke liye unique ID — PhonePe ek ID sirf ek baar accept karta hai
+    const merchantTransactionId = `${orderNumber}-${Date.now()}`;
+
     const data = {
       merchantId,
-      merchantTransactionId: orderNumber,
-      merchantUserId:        `WW_${orderNumber}`,
-      amount:                Math.round(amount * 100),
-      redirectUrl:           `${siteUrl}/payment-callback?order=${orderNumber}`,
-      redirectMode:          'REDIRECT',
-      callbackUrl:           `${siteUrl}/api/phonepe-webhook`,
-      mobileNumber:          phone ? phone.replace(/\D/g, '').slice(-10) : undefined,
-      paymentInstrument:     { type: 'PAY_PAGE' },
+      merchantTransactionId,
+      merchantUserId:    `WW_${orderNumber}`,
+      amount:            Math.round(amount * 100),
+      redirectUrl:       `${siteUrl}/payment-callback?order=${orderNumber}&txn=${merchantTransactionId}`,
+      redirectMode:      'REDIRECT',
+      callbackUrl:       `${siteUrl}/api/phonepe-webhook`,
+      mobileNumber:      phone ? phone.replace(/\D/g, '').slice(-10) : undefined,
+      paymentInstrument: { type: 'PAY_PAGE' },
     };
 
     const base64Payload = Buffer.from(JSON.stringify(data)).toString('base64');
@@ -50,12 +53,14 @@ export default async function handler(req, res) {
         body:    JSON.stringify({ request: base64Payload }),
       });
       const result = await r.json();
+      console.log('[PhonePe] Initiate:', result.code, result.message);
 
       if (result.success) {
         return res.status(200).json({
           success:       true,
           redirectUrl:   result.data?.instrumentResponse?.redirectInfo?.url,
-          transactionId: orderNumber,
+          transactionId: merchantTransactionId,
+          orderNumber,
         });
       }
       return res.status(400).json({ success: false, error: result.message ?? 'PhonePe initiation failed', code: result.code });
@@ -64,7 +69,7 @@ export default async function handler(req, res) {
     }
   }
 
-  // ── STATUS CHECK ─────────────────────────────────────────────────────────
+  // STATUS CHECK
   if (action === 'verify') {
     const { merchantTransactionId } = payload ?? {};
     if (!merchantTransactionId) return res.status(400).json({ error: 'merchantTransactionId required' });
@@ -86,7 +91,6 @@ export default async function handler(req, res) {
 
   return res.status(400).json({ error: `Unknown action: ${action}` });
 }
-
 // ── PhonePe Error Codes ───────────────────────────────────────────────────
 const PHONEPE_ERROR_CODES = {
   PAYMENT_ERROR:              'Payment failed. Please try again.',

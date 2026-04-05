@@ -161,58 +161,45 @@ export default function CheckoutPage() {
 
   // ── PHONEPE ───────────────────────────────────────────────────────────────
   async function placePhonePe() {
-    if (!user) { toast.error('Sign in first'); navigate('/auth'); return; }
-    if (!user.email_verified || !user.phone_verified) {
-      toast.error('Please verify both email and phone before placing orders.');
-      navigate('/account');
-      return;
+  if (!user) { toast.error('Sign in first'); navigate('/auth'); return; }
+  if (!user.email_verified || !user.phone_verified) {
+    toast.error('Please verify both email and phone before placing orders.');
+    navigate('/account');
+    return;
+  }
+  setPlacing(true);
+  try {
+    // 1. Order DB mein save karo
+    const orderNum = await saveOrder('phonepe', 'pending');
+ 
+    // 2. Shiprocket push (async)
+    autoPushToShiprocket(orderNum);
+ 
+    // 3. PhonePe initiate — ab transactionId alag hoga (orderNum + timestamp)
+    const res = await fetch('/api/phonepe', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action:  'initiate',
+        payload: { amount: total, orderNumber: orderNum, phone: address.phone },
+      }),
+    });
+    const data = await res.json();
+ 
+    if (data.success && data.redirectUrl) {
+      // ✅ transactionId URL mein already hai (redirectUrl mein ?txn= param)
+      clearCart();
+      window.location.href = data.redirectUrl;
+    } else {
+      toast.error(data.error || 'PhonePe initiation failed. Please try again.');
     }
-    setPlacing(true);
-    try {
-      // 1. Order DB mein save karo (payment_pending)
-      const orderNum = await saveOrder('phonepe', 'pending');
-
-      // 2. Shiprocket ko push karo (async — wait nahi)
-      autoPushToShiprocket(orderNum);
-
-      // 3. PhonePe payment initiate karo
-      const res = await fetch('/api/phonepe', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action:  'initiate',
-          payload: {
-            amount:      total,
-            orderNumber: orderNum,
-            phone:       address.phone,
-          },
-        }),
-      });
-      const data = await res.json();
-
-      if (data.success && data.redirectUrl) {
-        clearCart();
-        // PhonePe payment page pe redirect
-        window.location.href = data.redirectUrl;
-      } else {
-        toast.error(data.error || 'PhonePe initiation failed. Please try again.');
-      }
-    } catch (err: any) {
-      toast.error(err.message ?? 'Payment initiation failed');
-    } finally { setPlacing(false); }
+  } catch (err: any) {
+    toast.error(err.message ?? 'Payment initiation failed');
+  } finally {
+    setPlacing(false);
   }
-
-  if (items.length === 0) {
-    return (
-      <div className="container flex flex-col items-center justify-center gap-4 py-24">
-        <div className="h-16 w-16 rounded-2xl bg-secondary flex items-center justify-center">
-          <ArrowLeft className="h-7 w-7 text-muted-foreground" />
-        </div>
-        <h1 className="text-xl font-bold text-foreground">Your cart is empty</h1>
-        <Link to="/shop" className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-2.5 text-sm font-bold text-primary-foreground">Browse Products</Link>
-      </div>
-    );
-  }
+}
+ 
 
   const STEPS = [
     { key: 'address', label: 'Address' },
