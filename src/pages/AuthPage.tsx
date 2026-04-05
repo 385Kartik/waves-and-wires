@@ -492,7 +492,7 @@ export default function AuthPage() {
             {mode === 'signin_email' && <>
               <p>
                 Don't have an account?{' '}
-                <button onClick={toEmailSignup} className="text-primary font-bold hover:underline">Sign up with email</button>
+                <button onClick={toEmailSignup} className="text-primary font-bold hover:underline">Sign up</button>
               </p>
               <div className="flex items-center gap-3">
                 <div className="flex-1 h-px bg-border" />
