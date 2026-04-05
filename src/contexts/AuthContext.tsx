@@ -24,10 +24,8 @@ interface AuthContextType {
   signOut:            () => Promise<void>;
   resetPassword:      (email: string) => Promise<boolean>;
   updateProfile:      (data: { full_name?: string; phone?: string }) => Promise<boolean>;
-  // Email OTP flow (custom — no Supabase email change)
   sendEmailOtp:       (email: string) => Promise<boolean>;
   verifyEmailOtp:     (otp: string) => Promise<boolean>;
-  // SMS OTP flow
   sendSmsOtp:         (phone: string) => Promise<boolean>;
   verifySmsOtp:       (phone: string, otp: string) => Promise<boolean>;
   // Legacy aliases
@@ -71,7 +69,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const authEmail = sess.user.email ?? '';
     const isPhone   = isInternalEmail(authEmail);
 
-    // Profile email — internal email kabhi show mat karo
     const profileEmail = profile?.email ?? '';
     const displayEmail = isPhone
       ? (isInternalEmail(profileEmail) ? '' : profileEmail)
@@ -101,13 +98,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (mounted) handleSession(session);
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (!mounted || event === 'INITIAL_SESSION') return;
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return;
+      if (event === 'INITIAL_SESSION') return;
+
+      // FIX: Handle stale/invalid refresh tokens gracefully
+      if (event === 'TOKEN_REFRESHED' && !session) {
+        console.warn('[Auth] Token refresh failed — signing out');
+        await supabase.auth.signOut();
+        setUser(null);
+        setSession(null);
+        setLoading(false);
+        toast.error('Your session has expired. Please sign in again.');
+        return;
+      }
+
+      if (event === 'SIGNED_OUT') {
+        setUser(null);
+        setSession(null);
+        setLoading(false);
+        return;
+      }
+
       handleSession(session);
     });
+
     return () => { mounted = false; subscription.unsubscribe(); };
   }, []);
 
@@ -134,11 +154,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   // ─── signUpWithPhone ───────────────────────────────────────────────────────
-  // Internal email se account banao — signin OTP verify ke BAAD hoga
   async function signUpWithPhone(phone: string, password: string, fullName: string) {
     const formatted     = normalisePhone(phone);
     const internalEmail = phoneToInternalEmail(formatted);
 
+    // FIX: Check DB-level uniqueness
     const { data: existing } = await supabase
       .from('profiles').select('id').eq('phone', formatted).maybeSingle();
     if (existing) return { success: false, error: 'phone_exists' };
@@ -199,12 +219,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   // ─── sendEmailOtp ─────────────────────────────────────────────────────────
-  // Custom OTP email — supabase.auth.updateUser use NAHI karte (woh "Confirm Change of Email" bhejta hai)
   async function sendEmailOtp(email: string): Promise<boolean> {
     if (!user) return false;
     const cleanEmail = email.trim().toLowerCase();
     try {
-      // Pehle profile mein email save karo (unverified)
       await supabase.from('profiles').update({ email: cleanEmail, email_verified: false }).eq('id', user.id);
       setUser(prev => prev ? { ...prev, email: cleanEmail, email_verified: false } : prev);
 
@@ -251,19 +269,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   // ─── verifySmsOtp ─────────────────────────────────────────────────────────
-  // Server side: phone_verified = true already set ho jaata hai (sms-otp.js)
-  // Client side: user state update karo agar logged in hai
   async function verifySmsOtp(phone: string, otp: string): Promise<boolean> {
     const formatted = normalisePhone(phone);
     try {
       const res  = await fetch('/api/sms-otp', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'verify', phone: formatted, otp: otp.trim() }),
+        body: JSON.stringify({ action: 'verify', phone: formatted, otp: otp.trim(), user_id: user?.id }),
       });
       const data = await res.json();
       if (!res.ok || !data.success) { toast.error(data.error || 'Invalid OTP'); return false; }
 
-      // Logged-in user ka state update karo
       if (user) {
         setUser(prev => prev ? { ...prev, phone: formatted, phone_verified: true } : prev);
       }

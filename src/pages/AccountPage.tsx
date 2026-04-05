@@ -1,3 +1,4 @@
+// src/pages/AccountPage.tsx
 import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
@@ -21,23 +22,19 @@ export default function AccountPage() {
 
   const [orders, setOrders] = useState<any[]>([]);
 
-  // ── Name ──────────────────────────────────────────────────────────────────
   const [editingName, setEditingName] = useState(false);
   const [nameVal,     setNameVal]     = useState(user?.full_name ?? '');
 
-  // ── Email ─────────────────────────────────────────────────────────────────
   const [emailStep,   setEmailStep]   = useState<'view' | 'edit' | 'otp'>('view');
   const [emailVal,    setEmailVal]    = useState('');
   const [emailOtp,    setEmailOtp]    = useState('');
   const [emailBusy,   setEmailBusy]   = useState(false);
 
-  // ── Phone ─────────────────────────────────────────────────────────────────
-  const [phoneStep,      setPhoneStep]      = useState<'view' | 'edit' | 'otp'>('view');
-  const [phoneVal,       setPhoneVal]       = useState('');
-  const [phoneOtp,       setPhoneOtp]       = useState('');
-  const [phoneBusy,      setPhoneBusy]      = useState(false);
+  const [phoneStep,   setPhoneStep]   = useState<'view' | 'edit' | 'otp'>('view');
+  const [phoneVal,    setPhoneVal]    = useState('');
+  const [phoneOtp,    setPhoneOtp]    = useState('');
+  const [phoneBusy,   setPhoneBusy]   = useState(false);
 
-  // ── Change password ───────────────────────────────────────────────────────
   const [changingPw,  setChangingPw]  = useState(false);
   const [oldPw,       setOldPw]       = useState('');
   const [newPw,       setNewPw]       = useState('');
@@ -61,13 +58,11 @@ export default function AccountPage() {
   const hasEmail     = Boolean(user.email);
   const hasPhone     = Boolean(user.phone);
 
-  // ── Name ──────────────────────────────────────────────────────────────────
   async function saveName() {
     const ok = await updateProfile({ full_name: nameVal });
     if (ok) setEditingName(false);
   }
 
-  // ── Email: save + send OTP ─────────────────────────────────────────────────
   async function handleEmailSave() {
     if (!emailVal.trim().includes('@')) { toast.error('Enter a valid email'); return; }
     setEmailBusy(true);
@@ -76,7 +71,6 @@ export default function AccountPage() {
     if (ok) { setEmailStep('otp'); setEmailOtp(''); }
   }
 
-  // ── Email: verify OTP ──────────────────────────────────────────────────────
   async function handleEmailVerify() {
     if (emailOtp.trim().length !== 6) { toast.error('Enter the 6-digit OTP'); return; }
     setEmailBusy(true);
@@ -85,36 +79,63 @@ export default function AccountPage() {
     if (ok) { setEmailStep('view'); setEmailVal(''); setEmailOtp(''); }
   }
 
-  // ── Phone: save + send OTP ─────────────────────────────────────────────────
   async function handlePhoneSave() {
     const digits = phoneVal.replace(/\D/g, '');
     if (digits.length < 10) { toast.error('Enter a valid 10-digit number'); return; }
     const formatted = normalisePhone(phoneVal);
     setPhoneBusy(true);
-    // Save to profile first
+    // Mark phone as unverified in profile while we verify the new number
     await supabase.from('profiles').update({ phone: formatted, phone_verified: false }).eq('id', user.id);
     const ok = await sendSmsOtp(formatted);
     setPhoneBusy(false);
     if (ok) { setPhoneStep('otp'); setPhoneOtp(''); }
   }
 
-  // ── Phone: verify OTP ─────────────────────────────────────────────────────
   async function handlePhoneVerify() {
     if (phoneOtp.trim().length !== 6) { toast.error('Enter the 6-digit OTP'); return; }
     const formatted = normalisePhone(phoneVal || user.phone || '');
     setPhoneBusy(true);
     const ok = await verifySmsOtp(formatted, phoneOtp);
+
+    if (ok) {
+      // FIX: For phone-signup users, update the auth account email server-side.
+      // supabase.auth.updateUser() on client sends confirmation email to @ww.internal
+      // which doesn't exist. Use our server API with admin privileges instead.
+      if (user.is_phone_signup) {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          const res = await fetch('/api/update-phone-auth', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session?.access_token ?? ''}`,
+            },
+            body: JSON.stringify({ user_id: user.id, new_phone: formatted }),
+          });
+          const data = await res.json();
+          if (!data.success) {
+            console.error('[PhoneChange] Auth email update failed:', data.error);
+            // Non-blocking — profile is updated, auth email might be stale
+            // User can still login with new phone after next sign-in
+          }
+        } catch (err) {
+          console.error('[PhoneChange] Server request failed:', err);
+        }
+      }
+
+      setPhoneStep('view');
+      setPhoneVal('');
+      setPhoneOtp('');
+    }
+
     setPhoneBusy(false);
-    if (ok) { setPhoneStep('view'); setPhoneVal(''); setPhoneOtp(''); }
   }
 
-  // ── Change password ───────────────────────────────────────────────────────
   async function changePassword() {
     if (!oldPw || !newPw) { toast.error('Fill all fields'); return; }
     if (newPw.length < 8)  { toast.error('Min 8 characters'); return; }
     if (newPw !== newPwCon) { toast.error('Passwords do not match'); return; }
     setPwBusy(true);
-    // Phone signup users ke liye internal email use karo re-auth mein
     const authEmail = user.is_phone_signup && user.phone
       ? phoneToInternalEmail(user.phone)
       : user.email;
@@ -127,15 +148,14 @@ export default function AccountPage() {
     setChangingPw(false); setOldPw(''); setNewPw(''); setNewPwCon('');
   }
 
-  const inputCls   = "flex-1 rounded-lg border border-input bg-secondary px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring";
-  const pwInputCls = "w-full rounded-xl border border-border bg-secondary/60 px-4 py-2.5 pr-10 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 transition-all";
+  const inputCls    = "flex-1 rounded-lg border border-input bg-secondary px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring";
+  const pwInputCls  = "w-full rounded-xl border border-border bg-secondary/60 px-4 py-2.5 pr-10 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 transition-all";
   const otpInputCls = "w-full rounded-lg border border-green-300 bg-white px-3 py-2 text-sm text-center tracking-[0.4em] font-bold focus:outline-none focus:ring-2 focus:ring-green-400";
 
   return (
     <div className="container py-8 sm:py-10 max-w-3xl">
       <h1 className="text-2xl font-bold text-foreground mb-6 sm:mb-8">My Account</h1>
 
-      {/* ── Verification banner ─────────────────────────────────────────── */}
       {!bothVerified && (
         <div className={`mb-6 rounded-2xl border px-5 py-4 flex items-start gap-3 ${
           !hasEmail || !hasPhone ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'
@@ -155,7 +175,6 @@ export default function AccountPage() {
       )}
 
       <div className="grid gap-5 sm:gap-6 md:grid-cols-2">
-        {/* ── Profile card ──────────────────────────────────────────────── */}
         <div className="rounded-2xl border border-border bg-card p-5 sm:p-6 space-y-5">
 
           {/* Avatar */}
@@ -176,11 +195,10 @@ export default function AccountPage() {
             </div>
           </div>
 
-          {/* ── EMAIL ────────────────────────────────────────────────────── */}
+          {/* EMAIL */}
           <div className="space-y-2">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Email</p>
 
-            {/* VIEW */}
             {emailStep === 'view' && (
               hasEmail ? (
                 <>
@@ -191,18 +209,14 @@ export default function AccountPage() {
                       ? <span className="flex items-center gap-1 text-xs font-bold text-green-600 shrink-0"><CheckCircle2 className="h-3.5 w-3.5" /> Verified</span>
                       : <span className="flex items-center gap-1 text-xs font-semibold text-amber-600 shrink-0"><AlertCircle className="h-3.5 w-3.5" /> Unverified</span>
                     }
-                    <button
-                      onClick={() => { setEmailStep('edit'); setEmailVal(user.email); }}
-                      className="text-muted-foreground hover:text-foreground ml-1 shrink-0">
+                    <button onClick={() => { setEmailStep('edit'); setEmailVal(user.email); }} className="text-muted-foreground hover:text-foreground ml-1 shrink-0">
                       <Edit2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
                   {!user.email_verified && (
                     <div className="rounded-xl bg-amber-50 border border-amber-200 px-3 py-3 space-y-2">
                       <p className="text-xs text-amber-700">Verify your email to place orders.</p>
-                      <button
-                        onClick={() => { setEmailStep('edit'); setEmailVal(user.email); }}
-                        className="text-xs font-bold text-amber-700 hover:text-amber-900">
+                      <button onClick={() => { setEmailStep('edit'); setEmailVal(user.email); }} className="text-xs font-bold text-amber-700 hover:text-amber-900">
                         Send verification OTP →
                       </button>
                     </div>
@@ -214,71 +228,45 @@ export default function AccountPage() {
                     <p className="text-xs text-red-700 font-semibold">No email added yet</p>
                     <p className="text-xs text-red-600 mt-0.5">Required for order confirmations.</p>
                   </div>
-                  <button
-                    onClick={() => { setEmailStep('edit'); setEmailVal(''); }}
-                    className="flex items-center gap-1.5 text-xs font-bold text-primary hover:text-primary/80">
+                  <button onClick={() => { setEmailStep('edit'); setEmailVal(''); }} className="flex items-center gap-1.5 text-xs font-bold text-primary hover:text-primary/80">
                     <Plus className="h-3.5 w-3.5" /> Add Email Address
                   </button>
                 </div>
               )
             )}
 
-            {/* EDIT */}
             {emailStep === 'edit' && (
               <div className="space-y-2">
-                <input
-                  type="email" autoFocus value={emailVal}
-                  onChange={e => setEmailVal(e.target.value)}
-                  placeholder="you@example.com"
+                <input type="email" autoFocus value={emailVal} onChange={e => setEmailVal(e.target.value)} placeholder="you@example.com"
                   className="w-full rounded-xl border border-border bg-secondary/60 py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" />
                 <div className="flex gap-2">
-                  <button
-                    onClick={handleEmailSave} disabled={emailBusy}
+                  <button onClick={handleEmailSave} disabled={emailBusy}
                     className="flex-1 flex items-center justify-center gap-1 rounded-lg bg-primary text-primary-foreground text-xs font-bold py-2 hover:bg-primary/90 disabled:opacity-50">
                     <Mail className="h-3.5 w-3.5" />
                     {emailBusy ? 'Sending OTP…' : 'Send OTP to verify'}
                   </button>
-                  <button
-                    onClick={() => { setEmailStep('view'); setEmailVal(''); }}
-                    className="px-3 py-2 rounded-lg bg-secondary text-xs text-muted-foreground hover:bg-accent">
-                    Cancel
-                  </button>
+                  <button onClick={() => { setEmailStep('view'); setEmailVal(''); }} className="px-3 py-2 rounded-lg bg-secondary text-xs text-muted-foreground hover:bg-accent">Cancel</button>
                 </div>
               </div>
             )}
 
-            {/* OTP */}
             {emailStep === 'otp' && (
               <div className="rounded-xl bg-green-50 border border-green-200 px-3 py-3 space-y-3">
                 <p className="text-xs text-green-700 font-semibold">📧 OTP sent to {emailVal || user.email}</p>
-                <input
-                  type="text" inputMode="numeric" maxLength={6} autoFocus
-                  value={emailOtp} onChange={e => setEmailOtp(e.target.value.replace(/\D/g, ''))}
-                  placeholder="Enter 6-digit OTP"
-                  className={otpInputCls} />
+                <input type="text" inputMode="numeric" maxLength={6} autoFocus value={emailOtp} onChange={e => setEmailOtp(e.target.value.replace(/\D/g, ''))} placeholder="Enter 6-digit OTP" className={otpInputCls} />
                 <div className="flex gap-2">
-                  <button
-                    onClick={handleEmailVerify} disabled={emailBusy || emailOtp.length !== 6}
+                  <button onClick={handleEmailVerify} disabled={emailBusy || emailOtp.length !== 6}
                     className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-green-600 text-white text-xs font-bold py-2 hover:bg-green-700 disabled:opacity-50">
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                    {emailBusy ? 'Verifying…' : 'Confirm OTP'}
+                    <CheckCircle2 className="h-3.5 w-3.5" />{emailBusy ? 'Verifying…' : 'Confirm OTP'}
                   </button>
-                  <button
-                    onClick={() => { setEmailStep('view'); setEmailOtp(''); }}
-                    className="px-3 py-2 rounded-lg bg-secondary text-xs text-muted-foreground hover:bg-accent">
-                    Cancel
-                  </button>
+                  <button onClick={() => { setEmailStep('view'); setEmailOtp(''); }} className="px-3 py-2 rounded-lg bg-secondary text-xs text-muted-foreground hover:bg-accent">Cancel</button>
                 </div>
-                <button
-                  onClick={handleEmailSave} disabled={emailBusy}
-                  className="text-xs text-green-700 hover:underline disabled:opacity-60">
-                  Resend OTP
-                </button>
+                <button onClick={handleEmailSave} disabled={emailBusy} className="text-xs text-green-700 hover:underline disabled:opacity-60">Resend OTP</button>
               </div>
             )}
           </div>
 
-          {/* ── FULL NAME ─────────────────────────────────────────────────── */}
+          {/* FULL NAME */}
           <div className="space-y-1.5">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Full Name</p>
             {editingName ? (
@@ -295,11 +283,10 @@ export default function AccountPage() {
             )}
           </div>
 
-          {/* ── PHONE ─────────────────────────────────────────────────────── */}
+          {/* PHONE */}
           <div className="space-y-2">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Phone</p>
 
-            {/* VIEW */}
             {phoneStep === 'view' && (
               hasPhone ? (
                 <>
@@ -310,18 +297,14 @@ export default function AccountPage() {
                       ? <span className="flex items-center gap-1 text-xs font-bold text-green-600 shrink-0"><CheckCircle2 className="h-3.5 w-3.5" /> Verified</span>
                       : <span className="flex items-center gap-1 text-xs font-semibold text-amber-600 shrink-0"><AlertCircle className="h-3.5 w-3.5" /> Unverified</span>
                     }
-                    <button
-                      onClick={() => { setPhoneStep('edit'); setPhoneVal(user.phone?.replace('+91', '') ?? ''); }}
-                      className="text-muted-foreground hover:text-foreground ml-1 shrink-0">
+                    <button onClick={() => { setPhoneStep('edit'); setPhoneVal(user.phone?.replace('+91', '') ?? ''); }} className="text-muted-foreground hover:text-foreground ml-1 shrink-0">
                       <Edit2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
                   {!user.phone_verified && (
                     <div className="rounded-xl bg-amber-50 border border-amber-200 px-3 py-3 space-y-2">
                       <p className="text-xs text-amber-700">Verify your phone to place orders.</p>
-                      <button
-                        onClick={() => { setPhoneStep('edit'); setPhoneVal(user.phone?.replace('+91', '') ?? ''); }}
-                        className="text-xs font-bold text-amber-700 hover:text-amber-900">
+                      <button onClick={() => { setPhoneStep('edit'); setPhoneVal(user.phone?.replace('+91', '') ?? ''); }} className="text-xs font-bold text-amber-700 hover:text-amber-900">
                         Send verification OTP →
                       </button>
                     </div>
@@ -333,69 +316,45 @@ export default function AccountPage() {
                     <p className="text-xs text-red-700 font-semibold">No phone number added yet</p>
                     <p className="text-xs text-red-600 mt-0.5">Required to place orders.</p>
                   </div>
-                  <button
-                    onClick={() => { setPhoneStep('edit'); setPhoneVal(''); }}
-                    className="flex items-center gap-1.5 text-xs font-bold text-primary hover:text-primary/80">
+                  <button onClick={() => { setPhoneStep('edit'); setPhoneVal(''); }} className="flex items-center gap-1.5 text-xs font-bold text-primary hover:text-primary/80">
                     <Plus className="h-3.5 w-3.5" /> Add Phone Number
                   </button>
                 </div>
               )
             )}
 
-            {/* EDIT */}
             {phoneStep === 'edit' && (
               <div className="space-y-2">
                 <div className="flex gap-2">
                   <div className="flex items-center gap-1 rounded-xl border border-border bg-secondary/60 px-3 text-sm font-semibold shrink-0">🇮🇳 +91</div>
-                  <input
-                    type="tel" inputMode="numeric" maxLength={10} autoFocus
-                    value={phoneVal} onChange={e => setPhoneVal(e.target.value.replace(/\D/g, ''))}
-                    placeholder="9876543210"
+                  <input type="tel" inputMode="numeric" maxLength={10} autoFocus value={phoneVal}
+                    onChange={e => setPhoneVal(e.target.value.replace(/\D/g, ''))} placeholder="9876543210"
                     className="flex-1 rounded-xl border border-border bg-secondary/60 py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" />
                 </div>
                 <div className="flex gap-2">
-                  <button
-                    onClick={handlePhoneSave} disabled={phoneBusy}
+                  <button onClick={handlePhoneSave} disabled={phoneBusy}
                     className="flex-1 flex items-center justify-center gap-1 rounded-lg bg-primary text-primary-foreground text-xs font-bold py-2 hover:bg-primary/90 disabled:opacity-50">
                     <Phone className="h-3.5 w-3.5" />
                     {phoneBusy ? 'Sending OTP…' : 'Send OTP to verify'}
                   </button>
-                  <button
-                    onClick={() => { setPhoneStep('view'); setPhoneVal(''); }}
-                    className="px-3 py-2 rounded-lg bg-secondary text-xs text-muted-foreground hover:bg-accent">
-                    Cancel
-                  </button>
+                  <button onClick={() => { setPhoneStep('view'); setPhoneVal(''); }} className="px-3 py-2 rounded-lg bg-secondary text-xs text-muted-foreground hover:bg-accent">Cancel</button>
                 </div>
               </div>
             )}
 
-            {/* OTP */}
             {phoneStep === 'otp' && (
               <div className="rounded-xl bg-green-50 border border-green-200 px-3 py-3 space-y-3">
                 <p className="text-xs text-green-700 font-semibold">📱 OTP sent to +91 {phoneVal}</p>
-                <input
-                  type="text" inputMode="numeric" maxLength={6} autoFocus
-                  value={phoneOtp} onChange={e => setPhoneOtp(e.target.value.replace(/\D/g, ''))}
-                  placeholder="Enter 6-digit OTP"
-                  className={otpInputCls} />
+                <input type="text" inputMode="numeric" maxLength={6} autoFocus value={phoneOtp}
+                  onChange={e => setPhoneOtp(e.target.value.replace(/\D/g, ''))} placeholder="Enter 6-digit OTP" className={otpInputCls} />
                 <div className="flex gap-2">
-                  <button
-                    onClick={handlePhoneVerify} disabled={phoneBusy || phoneOtp.length !== 6}
+                  <button onClick={handlePhoneVerify} disabled={phoneBusy || phoneOtp.length !== 6}
                     className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-green-600 text-white text-xs font-bold py-2 hover:bg-green-700 disabled:opacity-50">
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                    {phoneBusy ? 'Verifying…' : 'Confirm OTP'}
+                    <CheckCircle2 className="h-3.5 w-3.5" />{phoneBusy ? 'Verifying…' : 'Confirm OTP'}
                   </button>
-                  <button
-                    onClick={() => { setPhoneStep('view'); setPhoneOtp(''); }}
-                    className="px-3 py-2 rounded-lg bg-secondary text-xs text-muted-foreground hover:bg-accent">
-                    Cancel
-                  </button>
+                  <button onClick={() => { setPhoneStep('view'); setPhoneOtp(''); }} className="px-3 py-2 rounded-lg bg-secondary text-xs text-muted-foreground hover:bg-accent">Cancel</button>
                 </div>
-                <button
-                  onClick={handlePhoneSave} disabled={phoneBusy}
-                  className="text-xs text-green-700 hover:underline disabled:opacity-60">
-                  Resend OTP
-                </button>
+                <button onClick={handlePhoneSave} disabled={phoneBusy} className="text-xs text-green-700 hover:underline disabled:opacity-60">Resend OTP</button>
               </div>
             )}
           </div>
@@ -404,14 +363,12 @@ export default function AccountPage() {
             Member since {format(new Date(user.created_at), 'MMMM yyyy')}
           </p>
 
-          {/* ── Change Password ─────────────────────────────────────────── */}
+          {/* Change Password */}
           <div className="space-y-3 pt-2 border-t border-border">
-            <button
-              onClick={() => { setChangingPw(v => !v); setOldPw(''); setNewPw(''); setNewPwCon(''); }}
+            <button onClick={() => { setChangingPw(v => !v); setOldPw(''); setNewPw(''); setNewPwCon(''); }}
               className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
               <KeyRound className="h-4 w-4" />{changingPw ? 'Cancel' : 'Change Password'}
             </button>
-
             {changingPw && (
               <div className="space-y-3 pt-1">
                 {[
@@ -420,9 +377,7 @@ export default function AccountPage() {
                   { val: newPwCon, set: setNewPwCon, show: showNewCon, setShow: setShowNewCon, ph: 'Confirm new password', match: newPwCon ? newPwCon === newPw : null },
                 ].map(({ val, set, show, setShow, ph, match }, i) => (
                   <div key={i} className="relative">
-                    <input
-                      type={show ? 'text' : 'password'} value={val}
-                      onChange={e => set(e.target.value)} placeholder={ph}
+                    <input type={show ? 'text' : 'password'} value={val} onChange={e => set(e.target.value)} placeholder={ph}
                       className={`${pwInputCls} ${match === true ? 'border-green-400' : match === false ? 'border-red-300' : ''}`} />
                     <button type="button" onClick={() => setShow((v: boolean) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                       {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -430,8 +385,7 @@ export default function AccountPage() {
                   </div>
                 ))}
                 {newPwCon && newPwCon !== newPw && <p className="text-xs text-red-500">Passwords do not match</p>}
-                <button
-                  onClick={changePassword} disabled={pwBusy}
+                <button onClick={changePassword} disabled={pwBusy}
                   className="flex items-center gap-1.5 rounded-xl bg-primary px-5 py-2.5 text-xs font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-all">
                   <Lock className="h-3.5 w-3.5" />{pwBusy ? 'Updating…' : 'Update Password'}
                 </button>
@@ -439,26 +393,23 @@ export default function AccountPage() {
             )}
           </div>
 
-          <button
-            onClick={() => signOut().then(() => navigate('/'))}
+          <button onClick={() => signOut().then(() => navigate('/'))}
             className="flex items-center gap-2 text-sm font-medium text-destructive hover:text-destructive/80 transition-colors">
             <LogOut className="h-4 w-4" />Sign Out
           </button>
         </div>
 
-        {/* ── Recent Orders ──────────────────────────────────────────────── */}
+        {/* Recent Orders */}
         <div className="rounded-2xl border border-border bg-card p-5 sm:p-6 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold text-foreground text-sm">Recent Orders</h2>
             <Link to="/order-tracking?tab=myorders" className="text-xs text-primary font-semibold hover:underline">View all →</Link>
           </div>
-
           {!bothVerified && (
             <div className="rounded-xl bg-secondary/50 border border-border px-4 py-3 text-xs text-muted-foreground">
               🔒 Verify both email and phone to place orders.
             </div>
           )}
-
           {orders.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-8 text-center">
               <Package className="h-8 w-8 text-muted-foreground/30" />
