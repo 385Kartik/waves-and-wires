@@ -14,7 +14,6 @@ function normalisePhone(raw) {
   return `+${digits}`;
 }
 
-// 2Factor ke liye: +919876543210 → 919876543210
 function phoneFor2Factor(formatted) {
   return formatted.replace('+', '');
 }
@@ -35,33 +34,23 @@ export default async function handler(req, res) {
   // ── SEND OTP ─────────────────────────────────────────────────────────────
   if (action === 'send') {
     try {
-      // Purane unexpired OTPs expire karo
       await supabase
         .from('phone_otps')
         .update({ used: true })
         .eq('phone', formatted)
         .eq('used', false);
 
-      // 2Factor AUTOGEN — khud OTP generate karta hai
       const url  = `https://2factor.in/API/V1/${apiKey}/SMS/${phoneFor2Factor(formatted)}/AUTOGEN`;
       const r    = await fetch(url);
       const data = await r.json();
 
-      if (data.Status !== 'Success') {
-        throw new Error(data.Details || '2Factor send failed');
-      }
+      if (data.Status !== 'Success') throw new Error(data.Details || '2Factor send failed');
 
-      // 2Factor ek session ID deta hai — isi se verify hoga
-      const sessionId = data.Details;
-
-      const { error: insertErr } = await supabase
-        .from('phone_otps')
-        .insert({
-          phone:      formatted,
-          otp:        sessionId,  // session_id otp column mein store
-          expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
-        });
-
+      const { error: insertErr } = await supabase.from('phone_otps').insert({
+        phone:      formatted,
+        otp:        data.Details,
+        expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+      });
       if (insertErr) throw insertErr;
 
       console.log(`[SMS OTP] Sent to ${formatted}`);
@@ -77,7 +66,6 @@ export default async function handler(req, res) {
     if (!inputOtp) return res.status(400).json({ error: 'OTP required' });
 
     try {
-      // Latest unexpired session_id fetch karo
       const { data: record, error: fetchErr } = await supabase
         .from('phone_otps')
         .select('*')
@@ -88,14 +76,9 @@ export default async function handler(req, res) {
         .limit(1)
         .single();
 
-      if (fetchErr || !record) {
-        return res.status(400).json({ error: 'OTP expired. Request a new one.' });
-      }
+      if (fetchErr || !record) return res.status(400).json({ error: 'OTP expired. Request a new one.' });
 
-      const sessionId = record.otp; // yahan session_id hai
-
-      // 2Factor se verify karo
-      const url  = `https://2factor.in/API/V1/${apiKey}/SMS/VERIFY/${sessionId}/${inputOtp.trim()}`;
+      const url  = `https://2factor.in/API/V1/${apiKey}/SMS/VERIFY/${record.otp}/${inputOtp.trim()}`;
       const r    = await fetch(url);
       const data = await r.json();
 
@@ -103,10 +86,9 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Invalid OTP. Try again.' });
       }
 
-      // OTP mark as used
       await supabase.from('phone_otps').update({ used: true }).eq('id', record.id);
 
-      // ✅ Phone user ki internal email confirm karo (Supabase auth bypass)
+      // ✅ Profile fetch → email_confirm + phone_verified set karo (signup + account page dono)
       const { data: profile } = await supabase
         .from('profiles')
         .select('id')
@@ -115,7 +97,8 @@ export default async function handler(req, res) {
 
       if (profile?.id) {
         await supabase.auth.admin.updateUserById(profile.id, { email_confirm: true });
-        console.log(`[SMS OTP] Email confirmed for user ${profile.id}`);
+        await supabase.from('profiles').update({ phone_verified: true }).eq('id', profile.id);
+        console.log(`[SMS OTP] phone_verified=true for user ${profile.id}`);
       }
 
       return res.status(200).json({ success: true });
