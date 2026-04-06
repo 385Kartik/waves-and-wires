@@ -80,8 +80,8 @@ export default async function handler(req, res) {
 
       // CellX ko SMS bhejo
       const messageText = encodeURIComponent(
-        `Your OTP for Waves & Wires is ${otp}. Valid for 10 minutes. Do not share with anyone. - WWIRES`
-      );
+  `Your OTP for login/signup on Waves & Wires is ${otp}. Valid for 10 minutes. Do not share with anyone. - WWIRES`
+);
 
       // Phone number without + for CellX (91XXXXXXXXXX format)
       const toNumber = formatted.replace('+', '');
