@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { sendEmail, orderConfirmHtml } from '@/lib/email';
-import { sendSms, orderConfirmSms } from '@/lib/sms';
+import { sendSms } from '@/lib/sms';
 
 type Step = 'address' | 'payment' | 'confirm';
 type PayMethod = 'cod' | 'phonepe';
@@ -155,7 +155,7 @@ export default function CheckoutPage() {
       toast.success('Order placed! Pay on delivery.');
       sendEmail(user.email, `Order Confirmed — ${orderNum}`,
         orderConfirmHtml({ name: address.full_name, orderNum, items, subtotal, discount, shipping, tax, total, paymentMethod: 'cod' }));
-      if (user.phone) sendSms(user.phone, orderConfirmSms(orderNum, total, user.full_name));
+      if (user.phone) sendSms(user.phone, 'order_confirm', { orderNum, total })
       navigate(`/order-tracking?order=${orderNum}`);
     } catch (err: any) {
       toast.error(err.message ?? 'Failed to place order');

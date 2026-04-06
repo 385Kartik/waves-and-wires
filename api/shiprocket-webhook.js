@@ -1,8 +1,9 @@
 // api/shiprocket-webhook.js
-// GallaBox WhatsApp delivery notification REMOVED — sirf email rehta hai
+// Delivered hone pe — email + SMS dono jaate hain
 
-import { createClient } from '@supabase/supabase-js';
-import nodemailer        from 'nodemailer';
+import { createClient }   from '@supabase/supabase-js';
+import nodemailer          from 'nodemailer';
+import { sendSmsServer }   from './send-sms.js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL            || process.env.VITE_SUPABASE_URL,
@@ -82,6 +83,7 @@ async function sendDeliveryEmail(toEmail, name, orderNum, total) {
       subject: `Your order #${orderNum} has been delivered! 📦`,
       html:    deliveryEmailHtml(name, orderNum, total),
     });
+    console.log(`[Webhook] Delivery email sent to ${toEmail}`);
   } catch (err) {
     console.error('[Webhook] Delivery email failed:', err.message);
   }
@@ -121,18 +123,32 @@ export default async function handler(req, res) {
       return res.status(200).json({ status: 'ok', note: 'order not found' });
     }
 
-    // Delivery email only (GallaBox WhatsApp removed)
+    // ── Delivered: Email + SMS dono bhejo ─────────────────────────────────
     if (newStatus === 'delivered' && updatedOrder?.user_id) {
       const { data: profile } = await supabase
         .from('profiles')
-        .select('email, full_name')
+        .select('email, phone, full_name')
         .eq('id', updatedOrder.user_id)
         .single();
 
       const customerName = updatedOrder.shipping_address?.full_name ?? profile?.full_name ?? 'Customer';
 
+      // Email
       if (profile?.email) {
-        sendDeliveryEmail(profile.email, customerName, updatedOrder.order_number, updatedOrder.total);
+        sendDeliveryEmail(
+          profile.email,
+          customerName,
+          updatedOrder.order_number,
+          updatedOrder.total
+        );
+      }
+
+      // SMS
+      if (profile?.phone) {
+        sendSmsServer(profile.phone, 'order_delivered', {
+          orderNum: updatedOrder.order_number,
+          total:    updatedOrder.total,
+        });
       }
     }
 
