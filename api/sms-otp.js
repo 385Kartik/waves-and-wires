@@ -114,60 +114,84 @@ export default async function handler(req, res) {
   }
 
   // ── VERIFY OTP ───────────────────────────────────────────────────────────
-  if (action === 'verify') {
-    if (!inputOtp) return res.status(400).json({ error: 'OTP required' });
+if (action === 'verify') {
+  const { otp: inputOtp, password, full_name } = req.body ?? {};
+  if (!inputOtp) return res.status(400).json({ error: 'OTP required' });
 
-    try {
-      const { data: record, error: fetchErr } = await supabase
-        .from('phone_otps')
-        .select('*')
-        .eq('phone', formatted)
-        .eq('used', false)
-        .gt('expires_at', new Date().toISOString())
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
+  try {
+    const { data: record, error: fetchErr } = await supabase
+      .from('phone_otps')
+      .select('*')
+      .eq('phone', formatted)
+      .eq('used', false)
+      .gt('expires_at', new Date().toISOString())
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
 
-      if (fetchErr || !record) {
-        return res.status(400).json({ error: 'OTP expired. Request a new one.' });
-      }
-
-      // OTP match karo (DB mein stored OTP se compare)
-      if (record.otp !== inputOtp.trim()) {
-        return res.status(400).json({ error: 'Invalid OTP. Try again.' });
-      }
-
-      // OTP use hua mark karo
-      await supabase.from('phone_otps').update({ used: true }).eq('id', record.id);
-
-      // Profile by phone dhundo
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('phone', formatted)
-        .maybeSingle();
-
-      // Agar alag user ka phone hai toh block
-      if (profile?.id && user_id && profile.id !== user_id) {
-        return res.status(400).json({ error: 'This phone number is already linked to another account.' });
-      }
-
-      const targetUserId = profile?.id ?? user_id;
-
-      if (targetUserId) {
-        await supabase.auth.admin.updateUserById(targetUserId, { email_confirm: true });
-        await supabase
-          .from('profiles')
-          .update({ phone_verified: true, phone: formatted })
-          .eq('id', targetUserId);
-        console.log(`[SMS OTP] phone_verified=true for user ${targetUserId}`);
-      }
-
-      return res.status(200).json({ success: true });
-    } catch (err) {
-      return res.status(500).json({ error: err.message });
+    if (fetchErr || !record) {
+      return res.status(400).json({ error: 'OTP expired. Request a new one.' });
     }
+
+    if (record.otp !== inputOtp.trim()) {
+      return res.status(400).json({ error: 'Invalid OTP. Try again.' });
+    }
+
+    await supabase.from('phone_otps').update({ used: true }).eq('id', record.id);
+
+    // Profile check — existing user?
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('phone', formatted)
+      .maybeSingle();
+
+    if (profile?.id && user_id && profile.id !== user_id) {
+      return res.status(400).json({ error: 'This phone number is already linked to another account.' });
+    }
+
+    const targetUserId = profile?.id ?? user_id;
+
+    if (targetUserId) {
+      // Existing user — phone verify karo
+      await supabase.auth.admin.updateUserById(targetUserId, { phone_confirm: true });
+      await supabase
+        .from('profiles')
+        .update({ phone_verified: true, phone: formatted })
+        .eq('id', targetUserId);
+
+    } else if (password && full_name) {
+      // Naya user — native phone se banao, fake email nahi
+      const { data: newUser, error: createErr } = await supabase.auth.admin.createUser({
+        phone:         formatted,
+        password:      password,
+        phone_confirm: true,
+        user_metadata: { full_name },
+      });
+
+      if (createErr) {
+        console.error('[SMS OTP] User create failed:', createErr.message);
+        return res.status(500).json({ error: createErr.message });
+      }
+
+      await supabase.from('profiles').upsert({
+        id:             newUser.user.id,
+        full_name:      full_name,
+        phone:          formatted,
+        phone_verified: true,
+        is_admin:       false,
+      });
+
+      console.log(`[SMS OTP] New user created for ${formatted}`);
+    } else {
+      return res.status(400).json({ error: 'password and full_name required for new signup' });
+    }
+
+    return res.status(200).json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
   }
+}
 
   return res.status(400).json({ error: 'Invalid action. Use "send" or "verify".' });
 }

@@ -27,10 +27,10 @@ interface AuthContextType {
   sendEmailOtp:       (email: string) => Promise<boolean>;
   verifyEmailOtp:     (otp: string) => Promise<boolean>;
   sendSmsOtp:         (phone: string) => Promise<boolean>;
-  verifySmsOtp:       (phone: string, otp: string) => Promise<boolean>;
+  verifySmsOtp:       (phone: string, otp: string, password?: string, fullName?: string) => Promise<boolean>;
   // Legacy aliases
   sendWhatsAppOtp:    (phone: string) => Promise<boolean>;
-  verifyWhatsAppOtp:  (phone: string, otp: string) => Promise<boolean>;
+ verifyWhatsAppOtp:  (phone: string, otp: string, password?: string, fullName?: string) => Promise<boolean>;
   refreshUser:        () => Promise<void>;
 }
 
@@ -154,32 +154,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   // ─── signUpWithPhone ───────────────────────────────────────────────────────
-  async function signUpWithPhone(phone: string, password: string, fullName: string) {
-    const formatted     = normalisePhone(phone);
-    const internalEmail = phoneToInternalEmail(formatted);
+  // REPLACE entire signUpWithPhone function:
+async function signUpWithPhone(phone: string, password: string, fullName: string) {
+  const formatted = normalisePhone(phone);
 
-    // FIX: Check DB-level uniqueness
-    const { data: existing } = await supabase
-      .from('profiles').select('id').eq('phone', formatted).maybeSingle();
-    if (existing) return { success: false, error: 'phone_exists' };
+  const { data: existing } = await supabase
+    .from('profiles').select('id').eq('phone', formatted).maybeSingle();
+  if (existing) return { success: false, error: 'phone_exists' };
 
-    const { data, error } = await supabase.auth.signUp({
-      email:    internalEmail,
-      password,
-      options:  { data: { full_name: fullName, phone: formatted } },
-    });
-
-    if (error) {
-      const msg = error.message.toLowerCase();
-      if (msg.includes('already registered') || msg.includes('already exists'))
-        return { success: false, error: 'phone_exists' };
-      return { success: false, error: error.message };
-    }
-    if (data.user && (!data.user.identities || data.user.identities.length === 0))
-      return { success: false, error: 'phone_exists' };
-
-    return { success: true };
-  }
+  return { success: true };
+}
 
   // ─── signInWithEmail ───────────────────────────────────────────────────────
   async function signInWithEmail(email: string, password: string) {
@@ -189,13 +173,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   // ─── signInWithPhone ───────────────────────────────────────────────────────
-  async function signInWithPhone(phone: string, password: string) {
-    const formatted     = normalisePhone(phone);
-    const internalEmail = phoneToInternalEmail(formatted);
-    const { error }     = await supabase.auth.signInWithPassword({ email: internalEmail, password });
-    if (error) { toast.error('Incorrect phone number or password'); return false; }
-    return true;
-  }
+  // REPLACE entire signInWithPhone function:
+async function signInWithPhone(phone: string, password: string) {
+  const formatted = normalisePhone(phone);
+  const { error } = await supabase.auth.signInWithPassword({
+    phone: formatted,
+    password,
+  });
+  if (error) { toast.error('Incorrect phone number or password'); return false; }
+  return true;
+}
 
   async function signOut() {
     await supabase.auth.signOut({ scope: 'global' });
@@ -269,23 +256,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   // ─── verifySmsOtp ─────────────────────────────────────────────────────────
-  async function verifySmsOtp(phone: string, otp: string): Promise<boolean> {
-    const formatted = normalisePhone(phone);
-    try {
-      const res  = await fetch('/api/sms-otp', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'verify', phone: formatted, otp: otp.trim(), user_id: user?.id }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) { toast.error(data.error || 'Invalid OTP'); return false; }
-
-      if (user) {
-        setUser(prev => prev ? { ...prev, phone: formatted, phone_verified: true } : prev);
-      }
-      toast.success('Phone verified! ✓');
-      return true;
-    } catch { toast.error('Verification failed'); return false; }
-  }
+  // REPLACE entire verifySmsOtp function:
+async function verifySmsOtp(phone: string, otp: string, password?: string, fullName?: string): Promise<boolean> {
+  const formatted = normalisePhone(phone);
+  try {
+    const res = await fetch('/api/sms-otp', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'verify',
+        phone: formatted,
+        otp: otp.trim(),
+        user_id: user?.id,
+        password,
+        full_name: fullName,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) { toast.error(data.error || 'Invalid OTP'); return false; }
+    if (user) {
+      setUser(prev => prev ? { ...prev, phone: formatted, phone_verified: true } : prev);
+    }
+    toast.success('Phone verified! ✓');
+    return true;
+  } catch { toast.error('Verification failed'); return false; }
+}
 
   // Legacy aliases
   const sendWhatsAppOtp   = sendSmsOtp;

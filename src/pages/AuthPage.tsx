@@ -182,7 +182,7 @@ export default function AuthPage() {
     if (otp.trim().length !== 6) { setError('Enter the 6-digit OTP.'); return; }
     setBusy(true);
     // Step 1: OTP verify karo — server side email_confirm = true ho jaayega
-    const ok = await verifyWhatsAppOtp(phone, otp);
+    const ok = await verifyWhatsAppOtp(phone, otp, password, fullName);
     if (!ok) { setBusy(false); return; }
 
     // Step 2: Ab signin karo — email confirmed hai toh 400 nahi aayega
