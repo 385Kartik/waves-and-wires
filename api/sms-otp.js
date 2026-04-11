@@ -17,7 +17,7 @@ const ALLOWED_ORIGINS = [
 const CELLX_USERNAME    = 'Numberwale03';
 const CELLX_PASSWORD    = process.env.CELLX_PASSWORD;   // .env mein daalo
 const CELLX_SENDER_ID   = 'WWIRES';
-const CELLX_PE_ID       = '1705168743850569290';
+const CELLX_PE_ID       = '1701159247473901156';
 const CELLX_TEMPLATE_ID = '1707177547575914691';
 
 function setCors(req, res) {

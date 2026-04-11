@@ -10,7 +10,7 @@ const CELLX_PE_ID    = '1705168743850569290';
 const TEMPLATES = {
   order_confirm:  process.env.CELLX_TMPL_ORDER_CONFIRM,   // "Your order {#var#} of Rs.{#var#} is confirmed!..."
   order_delivered: process.env.CELLX_TMPL_ORDER_DELIVERED, // "Your order {#var#} has been delivered..."
-  otp:            '1707177546341452055',                    // Already approved
+  otp:            '1707177547575914691',                    // Already approved
 };
 
 const ALLOWED_ORIGINS = [
@@ -71,12 +71,12 @@ export default async function handler(req, res) {
 
     if (type === 'order_confirm') {
       // DLT template: "Your order {#var#} of Rs.{#var#} is confirmed! Track: wavesandwires.in - WWIRES"
-      message    = `Your order ${orderNum} of Rs.${total} is confirmed! Track: wavesandwires.in - WWIRES`;
+      message    = message = `Your order no. ${orderNum} of Rs.${total} is confirmed! Track: https://wavesandwires.in/ - WWIRES`;;
       templateId = TEMPLATES.order_confirm;
 
     } else if (type === 'order_delivered') {
       // DLT template: "Your order {#var#} has been delivered. Thank you for shopping with Waves & Wires! - WWIRES"
-      message    = `Your order ${orderNum} has been delivered. Thank you for shopping with Waves & Wires! - WWIRES`;
+      message    = `Your order no. ${orderNum} has been delivered. Thank you for shopping with Waves & Wires! - WWIRES`
       templateId = TEMPLATES.order_delivered;
 
     } else {
