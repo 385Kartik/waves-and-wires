@@ -1,4 +1,3 @@
-// src/pages/AccountPage.tsx
 import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
@@ -6,9 +5,10 @@ import {
   Lock, Eye, EyeOff, KeyRound, CheckCircle2, AlertCircle, Plus,
 } from 'lucide-react';
 import { useAuth, normalisePhone, phoneToInternalEmail } from '@/contexts/AuthContext';
-import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { orderService } from '@/services/order.service';
+import { apiClient } from '@/api/client';
 
 const INR = (n: number) => `₹${n.toLocaleString('en-IN')}`;
 
@@ -47,15 +47,18 @@ export default function AccountPage() {
   useEffect(() => {
     if (!user) { navigate('/auth'); return; }
     setNameVal(user.full_name);
-    supabase.from('orders').select('*, order_items(id)').eq('user_id', user.id)
-      .order('created_at', { ascending: false }).limit(5)
-      .then(({ data }) => setOrders(data ?? []));
+    orderService.getOrders()
+      .then((res) => {
+        const data = res.data ?? [];
+        setOrders(data.slice(0, 5));
+      })
+      .catch(() => setOrders([]));
   }, [user]);
 
   if (!user) return null;
 
   const bothVerified = user.email_verified && user.phone_verified;
-  const hasEmail     = Boolean(user.email);
+  const hasEmail     = Boolean(user.email && !user.email.endsWith('@ww.internal'));
   const hasPhone     = Boolean(user.phone);
 
   async function saveName() {
@@ -84,8 +87,7 @@ export default function AccountPage() {
     if (digits.length < 10) { toast.error('Enter a valid 10-digit number'); return; }
     const formatted = normalisePhone(phoneVal);
     setPhoneBusy(true);
-    // Mark phone as unverified in profile while we verify the new number
-    await supabase.from('profiles').update({ phone: formatted, phone_verified: false }).eq('id', user.id);
+    await updateProfile({ phone: formatted, phone_verified: false } as any);
     const ok = await sendSmsOtp(formatted);
     setPhoneBusy(false);
     if (ok) { setPhoneStep('otp'); setPhoneOtp(''); }
@@ -98,26 +100,9 @@ export default function AccountPage() {
     const ok = await verifySmsOtp(formatted, phoneOtp);
 
     if (ok) {
-      // FIX: For phone-signup users, update the auth account email server-side.
-      // supabase.auth.updateUser() on client sends confirmation email to @ww.internal
-      // which doesn't exist. Use our server API with admin privileges instead.
       if (user.is_phone_signup) {
         try {
-          const { data: { session } } = await supabase.auth.getSession();
-          const res = await fetch('/api/update-phone-auth', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${session?.access_token ?? ''}`,
-            },
-            body: JSON.stringify({ user_id: user.id, new_phone: formatted }),
-          });
-          const data = await res.json();
-          if (!data.success) {
-            console.error('[PhoneChange] Auth email update failed:', data.error);
-            // Non-blocking — profile is updated, auth email might be stale
-            // User can still login with new phone after next sign-in
-          }
+          await apiClient.post('/update-phone-auth', { phone: formatted, user_id: user.id, new_phone: formatted });
         } catch (err) {
           console.error('[PhoneChange] Server request failed:', err);
         }
@@ -136,16 +121,18 @@ export default function AccountPage() {
     if (newPw.length < 8)  { toast.error('Min 8 characters'); return; }
     if (newPw !== newPwCon) { toast.error('Passwords do not match'); return; }
     setPwBusy(true);
-    const authEmail = user.is_phone_signup && user.phone
-      ? phoneToInternalEmail(user.phone)
-      : user.email;
-    const { error: signInErr } = await supabase.auth.signInWithPassword({ email: authEmail, password: oldPw });
-    if (signInErr) { toast.error('Current password is incorrect'); setPwBusy(false); return; }
-    const { error } = await supabase.auth.updateUser({ password: newPw });
+    try {
+      const res: any = await apiClient.put('/auth/password', { old_password: oldPw, new_password: newPw });
+      if (!res?.success && !res?.data?.success) {
+        toast.error(res?.message || res?.data?.message || 'Failed to update password');
+      } else {
+        toast.success('Password updated!');
+        setChangingPw(false); setOldPw(''); setNewPw(''); setNewPwCon('');
+      }
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to update password');
+    }
     setPwBusy(false);
-    if (error) { toast.error(error.message); return; }
-    toast.success('Password updated!');
-    setChangingPw(false); setOldPw(''); setNewPw(''); setNewPwCon('');
   }
 
   const inputCls    = "flex-1 rounded-lg border border-input bg-secondary px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring";
@@ -360,43 +347,15 @@ export default function AccountPage() {
           </div>
 
           <p className="text-xs text-muted-foreground">
-            Member since {format(new Date(user.created_at), 'MMMM yyyy')}
+            {user.created_at ? `Member since ${format(new Date(user.created_at), 'MMMM yyyy')}` : 'Member'}
           </p>
 
-          {/* Change Password */}
-          <div className="space-y-3 pt-2 border-t border-border">
-            <button onClick={() => { setChangingPw(v => !v); setOldPw(''); setNewPw(''); setNewPwCon(''); }}
-              className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-              <KeyRound className="h-4 w-4" />{changingPw ? 'Cancel' : 'Change Password'}
+          <div className="pt-2 border-t border-border">
+            <button onClick={() => signOut().then(() => navigate('/'))}
+              className="flex items-center gap-2 text-sm font-medium text-destructive hover:text-destructive/80 transition-colors">
+              <LogOut className="h-4 w-4" />Sign Out
             </button>
-            {changingPw && (
-              <div className="space-y-3 pt-1">
-                {[
-                  { val: oldPw, set: setOldPw, show: showOld, setShow: setShowOld, ph: 'Current password', match: null },
-                  { val: newPw, set: setNewPw, show: showNew, setShow: setShowNew, ph: 'New password (min 8 chars)', match: null },
-                  { val: newPwCon, set: setNewPwCon, show: showNewCon, setShow: setShowNewCon, ph: 'Confirm new password', match: newPwCon ? newPwCon === newPw : null },
-                ].map(({ val, set, show, setShow, ph, match }, i) => (
-                  <div key={i} className="relative">
-                    <input type={show ? 'text' : 'password'} value={val} onChange={e => set(e.target.value)} placeholder={ph}
-                      className={`${pwInputCls} ${match === true ? 'border-green-400' : match === false ? 'border-red-300' : ''}`} />
-                    <button type="button" onClick={() => setShow((v: boolean) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                      {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                ))}
-                {newPwCon && newPwCon !== newPw && <p className="text-xs text-red-500">Passwords do not match</p>}
-                <button onClick={changePassword} disabled={pwBusy}
-                  className="flex items-center gap-1.5 rounded-xl bg-primary px-5 py-2.5 text-xs font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-all">
-                  <Lock className="h-3.5 w-3.5" />{pwBusy ? 'Updating…' : 'Update Password'}
-                </button>
-              </div>
-            )}
           </div>
-
-          <button onClick={() => signOut().then(() => navigate('/'))}
-            className="flex items-center gap-2 text-sm font-medium text-destructive hover:text-destructive/80 transition-colors">
-            <LogOut className="h-4 w-4" />Sign Out
-          </button>
         </div>
 
         {/* Recent Orders */}

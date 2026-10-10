@@ -4,11 +4,12 @@ import {
   Search, Package, Truck, CheckCircle, Clock,
   ShoppingBag, XCircle, RefreshCw, AlertTriangle,
 } from 'lucide-react';
-import { supabase }  from '@/lib/supabase';
 import { useAuth }   from '@/contexts/AuthContext';
 import { toast }     from 'sonner';
 import { format }    from 'date-fns';
 import { sendEmail, cancelEmailHtml, refundRequestHtml } from '@/lib/email';
+import { orderService } from '@/services/order.service';
+import { apiClient } from '@/api/client';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -29,6 +30,7 @@ interface Order {
   courier_name?:           string | null;
   shiprocket_order_id?:    string | null;
   shiprocket_shipment_id?: string | null;
+  user_id?: string;
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -274,23 +276,26 @@ export default function OrderTrackingPage() {
 
   async function enrichWithRefundStatus(orders: any[]): Promise<Order[]> {
     if (!orders.length) return orders;
-    const { data: refunds } = await supabase
-      .from('refund_requests')
-      .select('order_id, status')
-      .in('order_id', orders.map(o => o.id));
-    const map: Record<string, string> = {};
-    (refunds ?? []).forEach((r: any) => { map[r.order_id] = r.status; });
-    return orders.map(o => ({ ...o, refund_status: map[o.id] ?? null }));
+    try {
+      const res = await apiClient.post('/refunds/bulk-status', { order_ids: orders.map(o => o.id) });
+      const refunds = res.data?.data || res.data || [];
+      const map: Record<string, string> = {};
+      (refunds ?? []).forEach((r: any) => { map[r.order_id] = r.status; });
+      return orders.map(o => ({ ...o, refund_status: map[o.id] ?? o.refund_status ?? null }));
+    } catch {
+      return orders;
+    }
   }
 
   const loadMyOrders = useCallback(async () => {
     if (!user) return;
-    const { data } = await supabase
-      .from('orders')
-      .select('*, order_items(*), awb_code, courier_name, shiprocket_order_id, shiprocket_shipment_id')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
-    setMyOrders(await enrichWithRefundStatus(data ?? []));
+    try {
+      const res = await orderService.getOrders();
+      const data = res.data?.data || res.data || [];
+      setMyOrders(await enrichWithRefundStatus(data));
+    } catch (e) {
+      console.error(e);
+    }
   }, [user]);
 
   useEffect(() => { loadMyOrders(); }, [loadMyOrders]);
@@ -299,15 +304,16 @@ export default function OrderTrackingPage() {
     const q = num ?? query;
     if (!q.trim()) return;
     setLoading(true); setSearched(true);
-    const { data } = await supabase
-      .from('orders')
-      .select('*, order_items(*), awb_code, courier_name, shiprocket_order_id, shiprocket_shipment_id')
-      .ilike('order_number', q.trim())
-      .single();
-    if (data) {
-      const [enriched] = await enrichWithRefundStatus([data]);
-      setOrder(enriched ?? null);
-    } else {
+    try {
+      const res = await orderService.getOrder(q.trim());
+      const data = res.data?.data || res.data;
+      if (data) {
+        const [enriched] = await enrichWithRefundStatus([data]);
+        setOrder(enriched ?? null);
+      } else {
+        setOrder(null);
+      }
+    } catch (e) {
       setOrder(null);
     }
     setLoading(false);
@@ -323,29 +329,20 @@ export default function OrderTrackingPage() {
   setActionLoading(true);
   try {
     // ── 1. Verify order is still cancellable (fresh read to avoid race) ──────
-    const { data: freshOrder, error: verifyErr } = await supabase
-      .from('orders')
-      .select('status, user_id')
-      .eq('id', o.id)
-      .single();
+    const res = await orderService.getOrder(o.id);
+    const freshOrder = res.data?.data || res.data;
  
-    if (verifyErr || !freshOrder)
+    if (!freshOrder)
       throw new Error('Could not verify order. Please refresh and try again.');
  
-    if (freshOrder.user_id !== user.id)
+    if (String(freshOrder.user_id) !== String(user.id))
       throw new Error('Unauthorized — this order does not belong to your account.');
  
     if (!['pending', 'confirmed'].includes(freshOrder.status))
       throw new Error(`Order cannot be cancelled. Current status: "${freshOrder.status}".`);
  
     // ── 2. Cancel in DB ──────────────────────────────────────────────────────
-    const { error: cancelErr } = await supabase
-      .from('orders')
-      .update({ status: 'cancelled', updated_at: new Date().toISOString() })
-      .eq('id', o.id)
-      .eq('user_id', user.id);  // double-check ownership at DB level
- 
-    if (cancelErr) throw cancelErr;
+    await orderService.updateOrder(o.id, { status: 'cancelled', updated_at: new Date().toISOString() });
  
     // ── 3. Cancel in Shiprocket ──────────────────────────────────────────────
     if (o.shiprocket_order_id) {
@@ -362,7 +359,7 @@ export default function OrderTrackingPage() {
     }
  
     // ── 4. Email notification ─────────────────────────────────────────────────
-    const isOnline = o.payment_method === 'razorpay' && o.payment_status === 'paid';
+    const isOnline = (o.payment_method === 'phonepe' || o.payment_method === 'razorpay') && o.payment_status === 'paid';
     if (user.email) {
       sendEmail(
         user.email,
@@ -399,12 +396,10 @@ export default function OrderTrackingPage() {
     }
     setActionLoading(true);
     try {
-      const { data, error } = await supabase.rpc('request_refund', {
-        p_order_id: o.id, p_reason: refundReason.trim(),
-      });
-      if (error) throw error;
-      const result = data as { success: boolean; error?: string };
-      if (!result.success) { toast.error(result.error ?? 'Could not submit refund request'); return; }
+      const res: any = await apiClient.post(`/orders/${o.id}/refund`, { reason: refundReason.trim() });
+      if (!res?.success && !res?.data?.success) {
+        throw new Error(res?.message || res?.data?.message || 'Failed to submit refund request');
+      }
 
       if (user?.email) {
         sendEmail(

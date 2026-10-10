@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { Mail, Phone, MapPin, Send, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { supabase } from '@/lib/supabase';
 import { useStoreSettings } from '@/hooks/useStoreSettings';
 import { contactAdminHtml } from '@/lib/email';
+import { apiClient } from '@/api/client';
 
 export default function ContactPage() {
   const { settings } = useStoreSettings();
@@ -25,8 +25,8 @@ export default function ContactPage() {
       message: clean(form.message),
     };
 
-    const { error: dbErr } = await supabase.from('contact_messages').insert(sanitized);
-    if (dbErr) throw dbErr;
+    const res: any = await apiClient.post('/contact_messages', sanitized);
+    if (!res?.success && !res?.data?.success) throw new Error('Failed to send message');
 
     // Direct fetch instead of sendEmail wrapper
     await fetch('/api/send-email', {

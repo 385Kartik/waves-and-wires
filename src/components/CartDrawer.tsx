@@ -140,11 +140,13 @@ export default function CartDrawer() {
                           {/* Price */}
                           <div className="text-right">
                             <p className="text-sm font-black text-stone-900">
-                              ₹{(item.product.price * item.quantity).toLocaleString('en-IN')}
+                              ₹{(item.product.price * item.quantity - (item.product.id === 'm01-headset' && item.quantity >= 2 ? 200 : 0)).toLocaleString('en-IN')}
                             </p>
                             {item.quantity > 1 && (
                               <p className="text-[10px] text-stone-400">
-                                ₹{item.product.price.toLocaleString('en-IN')} each
+                                {item.product.id === 'm01-headset' && item.quantity >= 2
+                                  ? 'Combo ₹200 OFF applied'
+                                  : `₹${item.product.price.toLocaleString('en-IN')} each`}
                               </p>
                             )}
                           </div>
@@ -191,11 +193,9 @@ export default function CartDrawer() {
 
             {/* CTA */}
             <Link to="/checkout" onClick={() => setIsOpen(false)}
-              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-stone-900 py-3.5 text-sm font-black text-white hover:bg-stone-700 active:scale-[0.98] transition-all">
-              Checkout
-              <div className="h-5 w-5 rounded-lg bg-amber-400 flex items-center justify-center">
-                <ArrowRight className="h-3 w-3 text-stone-900" strokeWidth={3} />
-              </div>
+              className="flex w-full items-center justify-center gap-2 rounded-full bg-[#ffd814] hover:bg-[#f7ca00] py-3 text-sm font-bold text-zinc-900 border border-[#fcd200] shadow-sm active:scale-[0.98] transition-all">
+              Proceed to Buy ({itemCount} items)
+              <ArrowRight className="h-4 w-4 text-zinc-900" />
             </Link>
 
             <button onClick={() => setIsOpen(false)}

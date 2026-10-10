@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { Product } from '@/types';
-import { supabase } from '@/lib/supabase';
+import { wishlistService } from '@/services/wishlist.service';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
@@ -16,19 +16,17 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const [items, setItems] = useState<Product[]>([]);
 
-  // Load: from Supabase if logged in, else localStorage
+  // Load: from Service if logged in, else localStorage
   useEffect(() => {
     if (user) {
-      supabase
-        .from('wishlist')
-        .select('products(*)')
-        .eq('user_id', user.id)
-        .then(({ data }) => {
-          const products = (data ?? []).map((w: any) => w.products).filter(Boolean);
+      wishlistService.getWishlist()
+        .then((res) => {
+          const products = res.data ?? [];
           setItems(products);
           // Also persist locally
           localStorage.setItem('wishlist', JSON.stringify(products));
-        });
+        })
+        .catch(() => setItems([]));
     } else {
       try {
         setItems(JSON.parse(localStorage.getItem('wishlist') ?? '[]'));
@@ -45,13 +43,17 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
       setItems(next);
       localStorage.setItem('wishlist', JSON.stringify(next));
       toast.success('Removed from wishlist');
-      if (user) await supabase.from('wishlist').delete().eq('user_id', user.id).eq('product_id', product.id);
+      if (user) {
+        try { await wishlistService.remove(product.id); } catch (e) {}
+      }
     } else {
       const next = [...items, product];
       setItems(next);
       localStorage.setItem('wishlist', JSON.stringify(next));
       toast.success('Added to wishlist');
-      if (user) await supabase.from('wishlist').upsert({ user_id: user.id, product_id: product.id }, { onConflict: 'user_id,product_id' });
+      if (user) {
+        try { await wishlistService.add(product.id); } catch (e) {}
+      }
     }
   }, [items, user]);
 

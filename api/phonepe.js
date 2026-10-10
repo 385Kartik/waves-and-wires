@@ -43,7 +43,8 @@ export default async function handler(req, res) {
   const saltKey    = process.env.PHONEPE_SALT_KEY;
   const saltIndex  = process.env.PHONEPE_SALT_INDEX || '1';
   const reqOrigin  = req.headers.origin || (req.headers.host ? `https://${req.headers.host}` : '');
-  const siteUrl    = (process.env.SITE_URL || reqOrigin || 'https://wavesandwires.vercel.app').replace(/\/$/, '');
+  const siteUrl    = (process.env.SITE_URL || reqOrigin || 'https://wavesandwires.in').replace(/\/$/, '');
+  const whitelistedDomain = process.env.PHONEPE_ONBOARDING_URL || 'https://wavesandwires.in/';
 
   // ── INITIATE ────────────────────────────────────────────────────────────────
   if (action === 'initiate') {
@@ -81,9 +82,51 @@ export default async function handler(req, res) {
       console.log('[PhonePe] Initiate:', result.code, result.message);
 
       if (result.success) {
+        const redirectUrl = result.data?.instrumentResponse?.redirectInfo?.url;
+        if (redirectUrl && (envToken === 'prod' || envToken === 'production')) {
+          try {
+            const parsedUrl  = new URL(redirectUrl);
+            const sltTkn     = parsedUrl.searchParams.get('sltTkn');
+            const routingKey = parsedUrl.searchParams.get('routingKey') || 'W';
+            if (sltTkn) {
+              const exRes  = await fetch('https://api.phonepe.com/apis/pg/checkout/ui/v2/token/exchange', {
+                headers: { 'x-auth-token': sltTkn, 'x-routing-key': routingKey },
+              });
+              const exData = await exRes.json();
+              if (exData?.token) {
+                await fetch('https://api.phonepe.com/apis/pg/checkout/ui/v2/transaction/details', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type':              'application/json',
+                    'x-auth-token':              exData.token,
+                    'Authorization':             `Bearer ${exData.token}`,
+                    'x-routing-key':             routingKey,
+                    'x-device-type':             'desktop',
+                    'x-browser-fingerprint':     crypto.randomBytes(16).toString('hex'),
+                    'checkoutType':              'STANDARD_CHECKOUT',
+                    'X-SOURCE':                  'API',
+                    'X-SOURCE-INTEGRATION-MODE': 'REDIRECTION',
+                    'X-CLIENT':                  'browser',
+                    'X-CLIENT-TYPE':             'desktop',
+                    'X-CLIENT-SUBTYPE':          'desktop',
+                    'X-CLIENT-NAME':             'Chrome',
+                    'X-CLIENT-VERSION':          '124',
+                    'X-MERCHANT-DOMAIN':         whitelistedDomain,
+                    'X-APP-PACKAGE-NAME':        '',
+                    'X-SOURCE-CHANNEL':          'Windows',
+                    'X-SOURCE-CHANNEL-VERSION':  '10',
+                  },
+                  body: JSON.stringify({ retryConsentGranted: false, skipUpiIntentUrl: true }),
+                });
+              }
+            }
+          } catch (preErr) {
+            console.warn('[PhonePe] Pre-bind merchant domain warning:', preErr?.message);
+          }
+        }
         return res.status(200).json({
           success:       true,
-          redirectUrl:   result.data?.instrumentResponse?.redirectInfo?.url,
+          redirectUrl,
           transactionId: merchantTransactionId,
           orderNumber,
         });

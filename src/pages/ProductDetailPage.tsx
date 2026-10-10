@@ -5,7 +5,7 @@ import { useProduct, useProducts } from '@/hooks/useProducts';
 import { useCart } from '@/contexts/CartContext';
 import { useWishlist } from '@/contexts/WishlistContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/lib/supabase';
+import { apiClient } from '@/api/client';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import ProductCard from '@/components/ProductCard';
@@ -44,41 +44,43 @@ export default function ProductDetailPage() {
   const [hoverStar, setHoverStar] = useState(0);
 
   useEffect(() => {
+    setSelectedImage(0);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [slug]);
+
+  useEffect(() => {
     if (activeTab === 'reviews' && product?.id) loadReviews();
   }, [activeTab, product?.id]);
 
   useEffect(() => {
     if (!user || !product?.id) return;
-    supabase
-      .from('order_items')
-      .select('id, orders!inner(user_id, status)')
-      .eq('product_id', product.id)
-      .eq('orders.user_id', user.id)
-      .neq('orders.status', 'cancelled')
-      .limit(1)
-      .then(({ data }) => setHasPurchased((data?.length ?? 0) > 0));
+    apiClient.get(`/products/${product.id}/purchased`)
+      .then((res) => {
+        const purchased = res.data?.data?.purchased || res.data?.purchased || false;
+        setHasPurchased(purchased);
+      })
+      .catch(() => {});
   }, [user, product?.id]);
 
   async function loadReviews() {
     if (!product?.id) return;
     setReviewsLoading(true);
-    const { data } = await supabase
-      .from('reviews')
-      .select('id, user_id, rating, title, comment, is_verified, created_at, reviewer_name')
-      .eq('product_id', product.id)
-      .order('created_at', { ascending: false });
-
-    const mapped: Review[] = (data ?? []).map((r: any) => ({
-      id: r.id, user_id: r.user_id, rating: r.rating,
-      title: r.title, comment: r.comment, is_verified: r.is_verified,
-      created_at: r.created_at, reviewer_name: r.reviewer_name || 'Customer',
-    }));
-    setReviews(mapped);
-    if (user) {
-      const mine = mapped.find(r => r.user_id === user.id) ?? null;
-      setMyReview(mine);
-      if (mine) setReviewForm({ rating: mine.rating, title: mine.title ?? '', comment: mine.comment ?? '' });
-    }
+    try {
+      const res = await apiClient.get(`/products/${product.id}/reviews`);
+      const data = res.data?.data || res.data || [];
+      const mapped: Review[] = data.map((r: any) => ({
+        id: r.id || r._id, user_id: r.user_id, rating: r.rating,
+        title: r.title, comment: r.comment, is_verified: r.is_verified,
+        created_at: r.created_at || new Date().toISOString(),
+        reviewer_name: r.reviewer_name || 'Customer',
+      }));
+      setReviews(mapped);
+      if (user) {
+        const mine = mapped.find(r => r.user_id === user.id) ?? null;
+        setMyReview(mine);
+        if (mine) setReviewForm({ rating: mine.rating, title: mine.title ?? '', comment: mine.comment ?? '' });
+      }
+    } catch {}
     setReviewsLoading(false);
   }
 
@@ -95,14 +97,16 @@ export default function ProductDetailPage() {
         is_verified: hasPurchased,
       };
       if (myReview) {
-        const { error } = await supabase.from('reviews')
-          .update({ rating: payload.rating, title: payload.title, comment: payload.comment })
-          .eq('id', myReview.id);
-        if (error) throw error;
+        const res = await apiClient.put(`/products/${product.id}/reviews/${myReview.id}`, payload);
+        if (!res.data?.success && res.status !== 200 && res.status !== 201) throw new Error(res.data?.message || 'Failed');
         toast.success('Review updated!');
       } else {
-        const { error } = await supabase.from('reviews').insert(payload);
-        if (error) { if (error.code === '23505') toast.error('You already reviewed this product'); else throw error; return; }
+        const res = await apiClient.post(`/products/${product.id}/reviews`, payload);
+        if (!res.data?.success && res.status !== 200 && res.status !== 201) {
+          if (res.data?.message?.includes('already reviewed')) toast.error('You already reviewed this product');
+          else throw new Error(res.data?.message || 'Failed');
+          return;
+        }
         toast.success('Review submitted! Thank you.');
       }
       setShowReviewForm(false);
@@ -112,20 +116,23 @@ export default function ProductDetailPage() {
   }
 
   async function deleteReview() {
-    if (!myReview) return;
-    const { error } = await supabase.from('reviews').delete().eq('id', myReview.id);
-    if (error) { toast.error('Failed to delete review'); return; }
-    toast.success('Review deleted');
-    setMyReview(null); setShowReviewForm(false);
-    setReviewForm({ rating: 5, title: '', comment: '' });
-    await loadReviews();
+    if (!myReview || !product?.id) return;
+    try {
+      await apiClient.delete(`/products/${product.id}/reviews/${myReview.id}`);
+      toast.success('Review deleted');
+      setMyReview(null); setShowReviewForm(false);
+      setReviewForm({ rating: 5, title: '', comment: '' });
+      await loadReviews();
+    } catch {
+      toast.error('Failed to delete review');
+    }
   }
 
   if (loading) {
     return (
-      <div className="container py-8">
+      <div className="container py-8 max-w-7xl">
         <div className="grid gap-8 lg:grid-cols-2 animate-pulse">
-          <div className="aspect-square rounded-xl bg-secondary" />
+          <div className="aspect-square rounded-2xl bg-secondary" />
           <div className="space-y-4">
             <div className="h-8 rounded bg-secondary w-3/4" />
             <div className="h-4 rounded bg-secondary w-1/2" />
@@ -139,232 +146,290 @@ export default function ProductDetailPage() {
 
   if (!product) {
     return (
-      <div className="container py-20 text-center">
+      <div className="container py-20 text-center max-w-7xl">
         <h1 className="text-2xl font-bold text-foreground">Product Not Found</h1>
-        <Link to="/shop" className="mt-4 inline-block text-primary hover:underline">Back to Shop</Link>
+        <Link to="/shop" className="mt-4 inline-block text-primary font-bold hover:underline">Back to Shop</Link>
       </div>
     );
   }
 
-  const relatedProducts = related.filter((p: any) => p.category_id === product.category_id && p.id !== product.id).slice(0, 4);
+  const relatedProducts = related.filter((p: any) => p.id !== product.id).slice(0, 4);
   const inWishlist = isInWishlist(product.id);
-  const discount = product.compare_at_price ? Math.round(((product.compare_at_price - product.price) / product.compare_at_price) * 100) : 0;
-  const ratingDist = [5, 4, 3, 2, 1].map(star => ({ star, count: reviews.filter(r => r.rating === star).length }));
+  const discount = product.compare_at_price
+    ? Math.round(((product.compare_at_price - product.price) / product.compare_at_price) * 100)
+    : 0;
 
-  function handleAddToCart() {
-    addItem(product!, quantity);
-    setAdded(true);
-    setTimeout(() => setAdded(false), 2000);
-  }
+  const images = product.images && product.images.length > 0
+    ? product.images
+    : ['https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&h=800&fit=crop'];
 
   return (
-    <div className="container py-8">
+    <div className="container py-8 max-w-7xl">
+      {/* Breadcrumb */}
       <nav className="mb-6 flex items-center gap-2 text-xs text-muted-foreground">
-        <Link to="/" className="hover:text-foreground">Home</Link><span>/</span>
-        <Link to="/shop" className="hover:text-foreground">Shop</Link><span>/</span>
-        <span className="text-foreground font-medium truncate">{product.name}</span>
+        <Link to="/" className="hover:text-primary transition-colors">Home</Link>
+        <span>/</span>
+        <Link to="/shop" className="hover:text-primary transition-colors">Shop</Link>
+        <span>/</span>
+        <Link to={`/shop?category=${product.category_id}`} className="hover:text-primary transition-colors">{product.category_name || 'Products'}</Link>
+        <span>/</span>
+        <span className="text-foreground truncate max-w-xs">{product.name}</span>
       </nav>
 
-      <div className="grid gap-8 lg:grid-cols-2">
+      {/* Main product card */}
+      <div className="grid gap-8 lg:grid-cols-2 lg:gap-12">
+        {/* Gallery */}
         <div className="space-y-3">
-          <div className="aspect-square overflow-hidden rounded-xl border border-border bg-secondary">
-            <img src={product.images?.[selectedImage] ?? product.images?.[0]} alt={product.name} className="h-full w-full object-cover" />
+          <div className="relative aspect-square overflow-hidden rounded-3xl border border-border bg-card shadow-sm flex items-center justify-center p-4">
+            <img
+              src={images[selectedImage]}
+              alt={product.name}
+              className="max-h-full max-w-full object-contain transition-transform duration-500 hover:scale-105"
+            />
+            {discount > 0 && (
+              <span className="absolute top-4 left-4 rounded-xl bg-primary px-3 py-1 text-xs font-black text-primary-foreground shadow-sm">
+                {discount}% OFF
+              </span>
+            )}
+            <button
+              onClick={() => toggleItem(product)}
+              className={`absolute top-4 right-4 flex h-10 w-10 items-center justify-center rounded-2xl transition-all shadow-sm ${
+                inWishlist ? 'bg-red-500 text-white' : 'bg-white/90 text-muted-foreground hover:text-red-500'
+              }`}
+            >
+              <Heart className={`h-4 w-4 ${inWishlist ? 'fill-white' : ''}`} />
+            </button>
           </div>
-          {product.images?.length > 1 && (
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {product.images.map((img: string, i: number) => (
-                <button key={i} onClick={() => setSelectedImage(i)}
-                  className={`h-16 w-16 shrink-0 overflow-hidden rounded-lg border-2 transition-colors ${i === selectedImage ? 'border-primary' : 'border-border hover:border-primary/50'}`}>
-                  <img src={img} alt="" className="h-full w-full object-cover" />
+
+          {/* Thumbnails */}
+          {images.length > 1 && (
+            <div className="flex gap-2.5 overflow-x-auto pb-1">
+              {images.map((img, i) => (
+                <button
+                  key={i}
+                  onClick={() => setSelectedImage(i)}
+                  className={`relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl border-2 transition-all p-1 bg-card ${
+                    selectedImage === i ? 'border-primary shadow-sm scale-105' : 'border-border opacity-70 hover:opacity-100'
+                  }`}
+                >
+                  <img src={img} alt="" className="h-full w-full object-contain" />
                 </button>
               ))}
             </div>
           )}
         </div>
 
-        <div className="space-y-5">
-          {product.category_name && (
-            <span className="text-xs font-semibold uppercase tracking-wider text-primary">{product.category_name}</span>
-          )}
-          <h1 className="text-2xl font-bold text-foreground lg:text-3xl">{product.name}</h1>
-
-          <button className="flex items-center gap-2" onClick={() => setActiveTab('reviews')}>
-            <div className="flex items-center gap-0.5">
-              {[...Array(5)].map((_, i) => (
-                <Star key={i} className={`h-4 w-4 ${i < Math.floor(product.rating) ? 'fill-amber-400 text-amber-400' : 'fill-muted text-muted-foreground/30'}`} />
-              ))}
+        {/* Product details */}
+        <div className="flex flex-col space-y-5">
+          <div>
+            <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary uppercase tracking-wider">
+              {product.category_name || 'Electronics'}
+            </span>
+            <h1 className="mt-3 text-2xl sm:text-3xl font-black text-foreground leading-tight">
+              {product.name}
+            </h1>
+            <div className="mt-2 flex items-center gap-2">
+              <div className="flex items-center gap-0.5">
+                {[...Array(5)].map((_, i) => (
+                  <Star key={i} className={`h-4 w-4 ${i < Math.floor(product.rating || 4.5) ? 'fill-primary text-primary' : 'fill-muted text-muted-foreground/20'}`} />
+                ))}
+              </div>
+              <span className="text-xs font-bold text-foreground">{product.rating || 4.5}</span>
+              <span className="text-xs text-muted-foreground">({product.review_count || 120} reviews)</span>
             </div>
-            <span className="text-sm font-medium text-foreground">{product.rating}</span>
-            <span className="text-sm text-primary hover:underline">({product.review_count} reviews)</span>
-          </button>
+          </div>
 
-          <div className="flex items-center gap-3">
-            <span className="text-3xl font-bold text-foreground">₹{product.price.toLocaleString('en-IN')}</span>
+          {/* Price */}
+          <div className="flex items-baseline gap-3 rounded-2xl bg-secondary/50 p-4">
+            <span className="text-3xl font-black text-foreground">
+              ₹{(product.price || 0).toLocaleString('en-IN')}
+            </span>
             {product.compare_at_price && (
-              <>
-                <span className="text-lg text-muted-foreground line-through">₹{product.compare_at_price.toLocaleString('en-IN')}</span>
-                <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-bold text-green-700">{discount}% OFF</span>
-              </>
+              <span className="text-lg text-muted-foreground line-through">
+                ₹{product.compare_at_price.toLocaleString('en-IN')}
+              </span>
+            )}
+            {discount > 0 && (
+              <span className="rounded-lg bg-green-500/15 px-2 py-0.5 text-xs font-bold text-green-600">
+                Save ₹{((product.compare_at_price || 0) - (product.price || 0)).toLocaleString('en-IN')}
+              </span>
             )}
           </div>
-          <p className="text-sm text-muted-foreground leading-relaxed">{product.short_description}</p>
 
-          <div className="flex items-center gap-2">
-            <div className={`h-2 w-2 rounded-full ${product.stock > 0 ? 'bg-green-500' : 'bg-red-500'}`} />
-            <span className={`text-sm font-medium ${product.stock > 0 ? 'text-green-700' : 'text-red-600'}`}>
-              {product.stock > 10 ? 'In Stock' : product.stock > 0 ? `Only ${product.stock} left` : 'Out of Stock'}
-            </span>
-          </div>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            {product.short_description || product.description}
+          </p>
 
-          {product.stock > 0 && (
+          {/* Quantity & Add to Cart */}
+          <div className="space-y-3 pt-2">
             <div className="flex items-center gap-3">
-              <div className="flex items-center rounded-md border border-input">
-                <button onClick={() => setQuantity(q => Math.max(1, q - 1))} className="flex h-10 w-10 items-center justify-center text-muted-foreground hover:text-foreground transition-colors"><Minus className="h-4 w-4" /></button>
-                <span className="w-10 text-center text-sm font-semibold text-foreground">{quantity}</span>
-                <button onClick={() => setQuantity(q => Math.min(product.stock, q + 1))} className="flex h-10 w-10 items-center justify-center text-muted-foreground hover:text-foreground transition-colors"><Plus className="h-4 w-4" /></button>
+              <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Quantity</span>
+              <div className="flex items-center rounded-xl border border-border bg-card">
+                <button
+                  onClick={() => setQuantity(q => Math.max(1, q - 1))}
+                  disabled={quantity <= 1}
+                  className="px-3 py-1.5 text-foreground hover:text-primary disabled:opacity-30"
+                >
+                  <Minus className="h-3.5 w-3.5" />
+                </button>
+                <span className="w-8 text-center text-sm font-bold">{quantity}</span>
+                <button
+                  onClick={() => setQuantity(q => q + 1)}
+                  className="px-3 py-1.5 text-foreground hover:text-primary"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </button>
               </div>
-              <button onClick={handleAddToCart}
-                className={`flex flex-1 items-center justify-center gap-2 rounded-md py-2.5 text-sm font-semibold transition-all ${added ? 'bg-green-600 text-white' : 'bg-primary text-primary-foreground hover:bg-primary/90'}`}>
-                {added ? <><Check className="h-4 w-4" />Added!</> : <><ShoppingCart className="h-4 w-4" />Add to Cart</>}
-              </button>
-              <button onClick={() => toggleItem(product!)}
-                className={`flex h-10 w-10 items-center justify-center rounded-md border transition-colors ${inWishlist ? 'border-red-300 bg-red-50 text-red-500' : 'border-input hover:bg-secondary'}`}>
-                <Heart className={`h-4 w-4 ${inWishlist ? 'fill-red-500' : ''}`} />
+              <span className="text-xs font-semibold text-green-600">
+                {product.stock > 0 ? '✓ In Stock' : 'Out of Stock'}
+              </span>
+            </div>
+
+            <div className="flex gap-3 pt-1">
+              <button
+                onClick={() => {
+                  for (let i = 0; i < quantity; i++) addItem(product);
+                  setAdded(true);
+                  setTimeout(() => setAdded(false), 1500);
+                }}
+                disabled={product.stock === 0}
+                className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-primary py-4 text-sm font-black text-primary-foreground hover:bg-primary/90 disabled:opacity-40 transition-all shadow-md shadow-primary/20 active:scale-[0.99]"
+              >
+                {added ? <Check className="h-4 w-4" /> : <ShoppingCart className="h-4 w-4" />}
+                {added ? 'Added to Cart!' : 'Add to Cart'}
               </button>
             </div>
-          )}
+          </div>
 
-          <div className="grid grid-cols-3 gap-3 rounded-xl border border-border bg-secondary/50 p-4">
-            {[{ icon: Truck, label: 'Free Shipping', sub: 'Orders ₹999+' }, { icon: Shield, label: 'Secure Pay', sub: 'Razorpay' }, { icon: RotateCcw, label: '7-Day Return', sub: 'Easy process' }].map(({ icon: Icon, label, sub }) => (
-              <div key={label} className="flex flex-col items-center gap-1.5 text-center">
-                <Icon className="h-5 w-5 text-primary" />
-                <p className="text-xs font-semibold text-foreground">{label}</p>
-                <p className="text-[10px] text-muted-foreground">{sub}</p>
-              </div>
-            ))}
+          {/* Trust points */}
+          <div className="grid grid-cols-3 gap-3 border-t border-border pt-4">
+            <div className="flex items-center gap-2">
+              <Truck className="h-4 w-4 text-primary shrink-0" />
+              <span className="text-xs text-muted-foreground font-medium">Free Shipping above ₹999</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Shield className="h-4 w-4 text-primary shrink-0" />
+              <span className="text-xs text-muted-foreground font-medium">1 Year Brand Warranty</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <RotateCcw className="h-4 w-4 text-primary shrink-0" />
+              <span className="text-xs text-muted-foreground font-medium">7 Days Easy Return</span>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="mt-12">
-        <div className="flex gap-6 border-b border-border">
-          {(['description', 'specs', 'reviews'] as const).map(tab => (
-            <button key={tab} onClick={() => setActiveTab(tab)}
-              className={`pb-3 text-sm font-semibold capitalize transition-colors ${activeTab === tab ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground hover:text-foreground'}`}>
-              {tab === 'reviews' ? `Reviews (${product.review_count})` : tab}
+      <div className="mt-14">
+        <div className="flex border-b border-border">
+          {[
+            ['description', 'Description'],
+            ['specs', 'Specifications'],
+            ['reviews', `Reviews (${reviews.length})`],
+          ].map(([tab, label]) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab as any)}
+              className={`border-b-2 px-6 py-3 text-sm font-bold transition-all ${
+                activeTab === tab
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {label}
             </button>
           ))}
         </div>
 
-        <div className="mt-6">
+        <div className="py-6">
           {activeTab === 'description' && (
-            <p className="text-sm text-muted-foreground leading-relaxed max-w-3xl">{product.description}</p>
+            <div className="prose max-w-none text-muted-foreground leading-relaxed text-sm space-y-4">
+              <p>{product.description}</p>
+              {product.features && product.features.length > 0 && (
+                <div>
+                  <h4 className="font-bold text-foreground mb-2">Key Highlights:</h4>
+                  <ul className="list-disc list-inside space-y-1">
+                    {product.features.map((f, i) => <li key={i}>{f}</li>)}
+                  </ul>
+                </div>
+              )}
+            </div>
           )}
 
           {activeTab === 'specs' && (
-            <div className="max-w-xl divide-y divide-border rounded-xl border border-border overflow-hidden">
-              {Object.entries(product.specifications ?? {}).length > 0
-                ? Object.entries(product.specifications ?? {}).map(([k, v]) => (
-                    <div key={k} className="flex items-center px-4 py-3 bg-card">
-                      <span className="w-40 text-xs font-semibold text-muted-foreground shrink-0">{k}</span>
-                      <span className="text-sm text-foreground">{v as string}</span>
-                    </div>
-                  ))
-                : <p className="px-4 py-6 text-sm text-muted-foreground">No specifications available.</p>
-              }
+            <div className="max-w-xl rounded-2xl border border-border bg-card overflow-hidden">
+              <table className="w-full text-sm">
+                <tbody>
+                  {product.specifications && Object.entries(product.specifications).map(([key, val], i) => (
+                    <tr key={key} className={i % 2 === 0 ? 'bg-secondary/40' : ''}>
+                      <td className="px-4 py-3 font-semibold text-muted-foreground w-1/3">{key}</td>
+                      <td className="px-4 py-3 text-foreground">{val}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
 
           {activeTab === 'reviews' && (
-            <div className="space-y-8 max-w-3xl">
-              {/* Rating Overview */}
-              {reviews.length > 0 && (
-                <div className="flex flex-col sm:flex-row gap-8 rounded-2xl border border-border bg-card p-6">
-                  <div className="flex flex-col items-center justify-center min-w-[120px]">
-                    <span className="text-5xl font-black text-foreground">{product.rating}</span>
-                    <div className="flex gap-0.5 mt-1">
-                      {[...Array(5)].map((_, i) => (
-                        <Star key={i} className={`h-4 w-4 ${i < Math.floor(product.rating) ? 'fill-amber-400 text-amber-400' : 'fill-muted text-muted-foreground/30'}`} />
-                      ))}
-                    </div>
-                    <span className="text-xs text-muted-foreground mt-1">{product.review_count} reviews</span>
-                  </div>
-                  <div className="flex-1 space-y-1.5">
-                    {ratingDist.map(({ star, count }) => (
-                      <div key={star} className="flex items-center gap-3">
-                        <span className="text-xs w-4 text-right text-muted-foreground font-medium">{star}</span>
-                        <Star className="h-3 w-3 fill-amber-400 text-amber-400 shrink-0" />
-                        <div className="flex-1 h-2 rounded-full bg-secondary overflow-hidden">
-                          <div className="h-full rounded-full bg-amber-400 transition-all"
-                            style={{ width: reviews.length > 0 ? `${(count / reviews.length) * 100}%` : '0%' }} />
-                        </div>
-                        <span className="text-xs text-muted-foreground w-4">{count}</span>
-                      </div>
-                    ))}
-                  </div>
+            <div className="space-y-6 max-w-2xl">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-foreground text-lg">Customer Reviews</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">{reviews.length} reviews for this product</p>
                 </div>
-              )}
+                {!showReviewForm && (
+                  <button
+                    onClick={() => setShowReviewForm(true)}
+                    className="rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-all shadow-sm"
+                  >
+                    Write a Review
+                  </button>
+                )}
+              </div>
 
-              {/* Write Review CTA */}
-              {user && !showReviewForm && (
-                <button onClick={() => setShowReviewForm(true)}
-                  className="flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-5 py-2.5 text-sm font-semibold text-primary hover:bg-primary/10 transition-all">
-                  <Star className="h-4 w-4" />{myReview ? 'Edit Your Review' : 'Write a Review'}
-                </button>
-              )}
-              {!user && (
-                <div className="rounded-xl border border-border bg-secondary/50 p-4 text-sm text-muted-foreground">
-                  <Link to="/auth" className="font-bold text-primary hover:underline">Sign in</Link> to write a review.
-                </div>
-              )}
-
-              {/* Review Form */}
-              {showReviewForm && user && (
-                <div className="rounded-2xl border border-border bg-card p-6 space-y-4">
+              {/* Review form */}
+              {showReviewForm && (
+                <div className="rounded-2xl border border-primary/20 bg-primary/5 p-5 space-y-4">
                   <div className="flex items-center justify-between">
-                    <h3 className="font-bold text-foreground">{myReview ? 'Edit Your Review' : 'Write a Review'}</h3>
+                    <h4 className="text-sm font-bold text-foreground">{myReview ? 'Edit Your Review' : 'Write a Review'}</h4>
                     <button onClick={() => setShowReviewForm(false)} className="text-xs text-muted-foreground hover:text-foreground">Cancel</button>
                   </div>
-                  {hasPurchased && (
-                    <div className="flex items-center gap-2 text-xs font-semibold text-green-600 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
-                      <ThumbsUp className="h-3.5 w-3.5" />Verified Purchase — Your review will be marked as verified
-                    </div>
-                  )}
                   <div>
-                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 block">Your Rating *</label>
+                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 block">Rating</label>
                     <div className="flex gap-1">
                       {[1, 2, 3, 4, 5].map(s => (
-                        <button key={s} type="button"
-                          onMouseEnter={() => setHoverStar(s)} onMouseLeave={() => setHoverStar(0)}
+                        <button
+                          key={s}
+                          type="button"
+                          onMouseEnter={() => setHoverStar(s)}
+                          onMouseLeave={() => setHoverStar(0)}
                           onClick={() => setReviewForm(f => ({ ...f, rating: s }))}
-                          className="transition-transform hover:scale-110">
-                          <Star className={`h-7 w-7 transition-colors ${(hoverStar || reviewForm.rating) >= s ? 'fill-amber-400 text-amber-400' : 'fill-muted text-muted-foreground/30'}`} />
+                        >
+                          <Star className={`h-6 w-6 ${(hoverStar || reviewForm.rating) >= s ? 'fill-primary text-primary' : 'text-muted-foreground/30'}`} />
                         </button>
                       ))}
                     </div>
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1.5 block">Review Title <span className="font-normal normal-case">(optional)</span></label>
-                    <input value={reviewForm.title} onChange={e => setReviewForm(f => ({ ...f, title: e.target.value }))}
-                      maxLength={100} placeholder="Summarize your experience"
-                      className="w-full rounded-xl border border-border bg-secondary/60 px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 transition-all" />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1.5 block">Your Review *</label>
-                    <textarea value={reviewForm.comment} onChange={e => setReviewForm(f => ({ ...f, comment: e.target.value }))}
-                      rows={4} maxLength={500} placeholder="Share your honest experience with this product..."
-                      className="w-full rounded-xl border border-border bg-secondary/60 px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 transition-all resize-none" />
-                    <p className="text-[10px] text-muted-foreground text-right mt-1">{reviewForm.comment.length}/500</p>
+                    <textarea
+                      value={reviewForm.comment}
+                      onChange={e => setReviewForm(f => ({ ...f, comment: e.target.value }))}
+                      rows={3}
+                      placeholder="Share your experience with this product..."
+                      className="w-full rounded-xl border border-border bg-card p-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary"
+                    />
                   </div>
                   <div className="flex gap-3">
-                    <button onClick={submitReview} disabled={submitting}
-                      className="flex items-center gap-2 rounded-xl bg-primary px-6 py-2.5 text-sm font-black text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-all">
+                    <button
+                      onClick={submitReview}
+                      disabled={submitting}
+                      className="rounded-xl bg-primary px-5 py-2 text-xs font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                    >
                       {submitting ? 'Submitting…' : myReview ? 'Update Review' : 'Submit Review'}
                     </button>
                     {myReview && (
-                      <button onClick={deleteReview}
-                        className="rounded-xl border border-red-200 px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50 transition-all">
+                      <button onClick={deleteReview} className="rounded-xl border border-red-200 px-4 py-2 text-xs font-semibold text-red-600 hover:bg-red-50">
                         Delete
                       </button>
                     )}
@@ -372,55 +437,28 @@ export default function ProductDetailPage() {
                 </div>
               )}
 
-              {/* Reviews List */}
+              {/* Reviews list */}
               {reviewsLoading ? (
-                <div className="space-y-4">
-                  {[1,2,3].map(i => (
-                    <div key={i} className="rounded-xl border border-border p-5 animate-pulse space-y-3">
-                      <div className="flex gap-3"><div className="h-9 w-9 rounded-full bg-secondary" /><div className="space-y-1.5 flex-1"><div className="h-3 w-24 rounded bg-secondary" /><div className="h-3 w-16 rounded bg-secondary" /></div></div>
-                      <div className="h-3 rounded bg-secondary w-full" /><div className="h-3 rounded bg-secondary w-4/5" />
-                    </div>
+                <div className="space-y-3">
+                  {[1, 2].map(i => (
+                    <div key={i} className="h-24 rounded-2xl bg-secondary animate-pulse" />
                   ))}
                 </div>
               ) : reviews.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-border bg-secondary/30 p-10 text-center">
-                  <Star className="mx-auto h-10 w-10 text-muted-foreground/30 mb-3" />
-                  <p className="font-semibold text-foreground">No reviews yet</p>
-                  <p className="text-sm text-muted-foreground mt-1">Be the first to share your experience!</p>
-                </div>
+                <p className="text-sm text-muted-foreground py-6 text-center">No reviews yet. Be the first to review!</p>
               ) : (
-                <div className="space-y-4">
-                  {reviews.map(review => (
-                    <div key={review.id} className={`rounded-xl border bg-card p-5 space-y-3 ${review.user_id === user?.id ? 'border-primary/30 bg-primary/5' : 'border-border'}`}>
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                          <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                            <User className="h-4 w-4 text-primary" />
-                          </div>
-                          <div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <p className="text-sm font-semibold text-foreground">{review.reviewer_name}</p>
-                              {review.user_id === user?.id && <span className="text-[10px] font-bold bg-primary/10 text-primary px-2 py-0.5 rounded-full">You</span>}
-                              {review.is_verified && (
-                                <span className="flex items-center gap-1 text-[10px] font-bold text-green-600 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">
-                                  <ThumbsUp className="h-2.5 w-2.5" />Verified
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-[11px] text-muted-foreground">{format(new Date(review.created_at), 'dd MMM yyyy')}</p>
-                          </div>
-                        </div>
-                        <div className="flex gap-0.5 shrink-0">
+                <div className="space-y-3">
+                  {reviews.map(r => (
+                    <div key={r.id} className="rounded-2xl border border-border bg-card p-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-sm text-foreground">{r.reviewer_name}</span>
+                        <div className="flex gap-0.5">
                           {[...Array(5)].map((_, i) => (
-                            <Star key={i} className={`h-3.5 w-3.5 ${i < review.rating ? 'fill-amber-400 text-amber-400' : 'fill-muted text-muted-foreground/30'}`} />
+                            <Star key={i} className={`h-3.5 w-3.5 ${i < r.rating ? 'fill-primary text-primary' : 'text-muted-foreground/20'}`} />
                           ))}
                         </div>
                       </div>
-                      {review.title && <p className="text-sm font-semibold text-foreground">{review.title}</p>}
-                      {review.comment && <p className="text-sm text-muted-foreground leading-relaxed">{review.comment}</p>}
-                      {review.user_id === user?.id && !showReviewForm && (
-                        <button onClick={() => setShowReviewForm(true)} className="text-xs text-primary font-semibold hover:underline">Edit your review</button>
-                      )}
+                      {r.comment && <p className="text-sm text-muted-foreground">{r.comment}</p>}
                     </div>
                   ))}
                 </div>
@@ -430,9 +468,10 @@ export default function ProductDetailPage() {
         </div>
       </div>
 
+      {/* Related Products */}
       {relatedProducts.length > 0 && (
         <div className="mt-14">
-          <h2 className="text-xl font-bold text-foreground mb-6">Related Products</h2>
+          <h2 className="text-2xl font-black text-foreground mb-6">Related Products</h2>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
             {relatedProducts.map((p: any) => <ProductCard key={p.id} product={p} />)}
           </div>

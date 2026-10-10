@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Session } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase';
+import { authService } from '@/services/auth.service';
+import { apiClient } from '@/api/client';
 import { toast }    from 'sonner';
 import { sendEmail, welcomeEmailHtml } from '@/lib/email';
 
@@ -14,6 +14,11 @@ export interface AuthUser {
   is_admin: boolean; created_at: string;
 }
 
+export interface Session {
+  access_token: string;
+  user: AuthUser;
+}
+
 interface AuthContextType {
   user: AuthUser | null; session: Session | null;
   isLoading: boolean; isAdmin: boolean;
@@ -25,12 +30,12 @@ interface AuthContextType {
   resetPassword:      (email: string) => Promise<boolean>;
   updateProfile:      (data: { full_name?: string; phone?: string }) => Promise<boolean>;
   sendEmailOtp:       (email: string) => Promise<boolean>;
-  verifyEmailOtp:     (otp: string) => Promise<boolean>;
+  verifyEmailOtp:     (otp: string, email?: string, fullName?: string) => Promise<boolean>;
   sendSmsOtp:         (phone: string) => Promise<boolean>;
   verifySmsOtp:       (phone: string, otp: string, password?: string, fullName?: string) => Promise<boolean>;
   // Legacy aliases
   sendWhatsAppOtp:    (phone: string) => Promise<boolean>;
- verifyWhatsAppOtp:  (phone: string, otp: string, password?: string, fullName?: string) => Promise<boolean>;
+  verifyWhatsAppOtp:  (phone: string, otp: string, password?: string, fullName?: string) => Promise<boolean>;
   refreshUser:        () => Promise<void>;
 }
 
@@ -62,224 +67,217 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function handleSession(sess: Session | null) {
     if (!sess?.user) { setUser(null); setSession(null); setLoading(false); return; }
     setSession(sess);
-
-    const { data: profile } = await supabase
-      .from('profiles').select('*').eq('id', sess.user.id).single();
-
-    const authEmail = sess.user.email ?? '';
-    const isPhone   = isInternalEmail(authEmail);
-
-    const profileEmail = profile?.email ?? '';
-    const displayEmail = isPhone
-      ? (isInternalEmail(profileEmail) ? '' : profileEmail)
-      : authEmail;
-
-    setUser({
-      id:              sess.user.id,
-      email:           displayEmail,
-      full_name:       profile?.full_name ?? sess.user.user_metadata?.full_name ?? '',
-      phone:           profile?.phone ?? undefined,
-      avatar_url:      profile?.avatar_url ?? undefined,
-      email_verified:  isPhone
-                         ? Boolean(displayEmail && profile?.email_verified)
-                         : sess.user.email_confirmed_at != null,
-      phone_verified:  Boolean(profile?.phone_verified),
-      is_phone_signup: isPhone,
-      is_admin:        profile?.is_admin ?? false,
-      created_at:      sess.user.created_at,
-    });
+    setUser(sess.user);
     setLoading(false);
   }
 
   async function refreshUser() {
-    const { data: { session: sess } } = await supabase.auth.getSession();
-    await handleSession(sess);
+    try {
+      const res: any = await authService.session();
+      if (res.success && res.data) {
+        await handleSession({
+          access_token: res.data.token || '',
+          user: res.data.user,
+        });
+      } else {
+        await handleSession(null);
+      }
+    } catch {
+      await handleSession(null);
+    }
   }
 
   useEffect(() => {
     let mounted = true;
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (mounted) handleSession(session);
+    authService.session().then((res: any) => {
+      if (mounted) {
+        if (res.success && res.data) {
+          handleSession({
+            access_token: res.data.token || '',
+            user: res.data.user,
+          });
+        } else {
+          handleSession(null);
+        }
+      }
+    }).catch(() => {
+      if (mounted) handleSession(null);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted) return;
-      if (event === 'INITIAL_SESSION') return;
-
-      // FIX: Handle stale/invalid refresh tokens gracefully
-      if (event === 'TOKEN_REFRESHED' && !session) {
-        console.warn('[Auth] Token refresh failed — signing out');
-        await supabase.auth.signOut();
-        setUser(null);
-        setSession(null);
-        setLoading(false);
-        toast.error('Your session has expired. Please sign in again.');
-        return;
-      }
-
-      if (event === 'SIGNED_OUT') {
-        setUser(null);
-        setSession(null);
-        setLoading(false);
-        return;
-      }
-
-      handleSession(session);
-    });
-
-    return () => { mounted = false; subscription.unsubscribe(); };
+    return () => { mounted = false; };
   }, []);
 
-  // ─── signUpWithEmail ───────────────────────────────────────────────────────
+  // ─── Legacy password methods (kept for interface compatibility) ────────────
   async function signUpWithEmail(email: string, password: string, fullName: string) {
-    const { data, error } = await supabase.auth.signUp({
-      email, password,
-      options: {
-        data: { full_name: fullName },
-        emailRedirectTo: `${import.meta.env.VITE_SITE_URL ?? window.location.origin}/auth?verified=true`,
-      },
-    });
-    if (error) {
-      const msg = error.message.toLowerCase();
-      if (msg.includes('already registered') || msg.includes('already exists'))
-        return { success: false, error: 'account_exists' };
-      return { success: false, error: error.message };
+    try {
+      const res: any = await authService.register({ email, password, full_name: fullName });
+      if (!res.success) {
+        const msg = (res.message || '').toLowerCase();
+        if (msg.includes('already registered') || msg.includes('already exists'))
+          return { success: false, error: 'account_exists' };
+        return { success: false, error: res.message };
+      }
+      await refreshUser();
+      sendEmail(email, 'Welcome to Waves & Wires! 🎉', welcomeEmailHtml(fullName));
+      apiClient.post('/auth/email-otp', { action: 'send', email: email.trim().toLowerCase() }).catch(() => {});
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Signup failed' };
     }
-    if (data.user && (!data.user.identities || data.user.identities.length === 0))
-      return { success: false, error: 'account_exists' };
-
-    sendEmail(email, 'Welcome to Waves & Wires! 🎉', welcomeEmailHtml(fullName));
-    return { success: true };
   }
 
-  // ─── signUpWithPhone ───────────────────────────────────────────────────────
-  // REPLACE entire signUpWithPhone function:
-async function signUpWithPhone(phone: string, password: string, fullName: string) {
-  const formatted = normalisePhone(phone);
+  async function signUpWithPhone(phone: string, password: string, fullName: string) {
+    const formatted = normalisePhone(phone);
+    try {
+      const res: any = await authService.register({ phone: formatted, password, full_name: fullName });
+      if (!res.success) {
+        const msg = (res.message || '').toLowerCase();
+        if (msg.includes('already registered') || msg.includes('already exists') || msg.includes('phone_exists'))
+          return { success: false, error: 'phone_exists' };
+        return { success: false, error: res.message };
+      }
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Signup failed' };
+    }
+  }
 
-  const { data: existing } = await supabase
-    .from('profiles').select('id').eq('phone', formatted).maybeSingle();
-  if (existing) return { success: false, error: 'phone_exists' };
-
-  return { success: true };
-}
-
-  // ─── signInWithEmail ───────────────────────────────────────────────────────
   async function signInWithEmail(email: string, password: string) {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) { toast.error(error.message); return false; }
-    return true;
+    try {
+      const res: any = await authService.login({ email, password });
+      if (!res.success) { toast.error(res.message || 'Login failed'); return false; }
+      await refreshUser();
+      return true;
+    } catch (err: any) {
+      toast.error(err.message || 'Login failed');
+      return false;
+    }
   }
 
-  // ─── signInWithPhone ───────────────────────────────────────────────────────
-  // REPLACE entire signInWithPhone function:
-async function signInWithPhone(phone: string, password: string) {
-  const formatted = normalisePhone(phone);
-  const { error } = await supabase.auth.signInWithPassword({
-    phone: formatted,
-    password,
-  });
-  if (error) { toast.error('Incorrect phone number or password'); return false; }
-  return true;
-}
+  async function signInWithPhone(phone: string, password: string) {
+    const formatted = normalisePhone(phone);
+    try {
+      const res: any = await authService.login({ phone: formatted, password });
+      if (!res.success) { toast.error(res.message || 'Login failed'); return false; }
+      await refreshUser();
+      return true;
+    } catch (err: any) {
+      toast.error(err.message || 'Login failed');
+      return false;
+    }
+  }
 
   async function signOut() {
-    await supabase.auth.signOut({ scope: 'global' });
+    try {
+      await authService.logout();
+    } catch {}
+    setUser(null);
+    setSession(null);
+    setLoading(false);
   }
 
   async function resetPassword(email: string) {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${import.meta.env.VITE_SITE_URL ?? window.location.origin}/auth?reset=true`,
-    });
-    if (error) { toast.error(error.message); return false; }
-    return true;
+    try {
+      const res: any = await apiClient.post('/auth/email-otp', { email, action: 'send' });
+      if (!res?.success) { toast.error(res?.message || 'Failed to send OTP'); return false; }
+      return true;
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to send OTP');
+      return false;
+    }
   }
 
   async function updateProfile(data: { full_name?: string; phone?: string }) {
     if (!user) return false;
-    const { error } = await supabase.from('profiles').update(data).eq('id', user.id);
-    if (error) { toast.error(error.message); return false; }
-    setUser(prev => prev ? { ...prev, ...data } : prev);
-    toast.success('Profile updated');
-    return true;
+    try {
+      const res: any = await authService.updateProfile(data);
+      if (!res.success) { toast.error(res.message); return false; }
+      setUser(prev => prev ? { ...prev, ...data } : prev);
+      toast.success('Profile updated');
+      return true;
+    } catch (err: any) {
+      toast.error(err.message || 'Update failed');
+      return false;
+    }
   }
 
-  // ─── sendEmailOtp ─────────────────────────────────────────────────────────
+  // ─── sendEmailOtp (Works for Sign In, Sign Up, and AccountPage verification) ─
   async function sendEmailOtp(email: string): Promise<boolean> {
-    if (!user) return false;
     const cleanEmail = email.trim().toLowerCase();
     try {
-      await supabase.from('profiles').update({ email: cleanEmail, email_verified: false }).eq('id', user.id);
-      setUser(prev => prev ? { ...prev, email: cleanEmail, email_verified: false } : prev);
-
-      const res  = await fetch('/api/email-otp', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'send', user_id: user.id, email: cleanEmail }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) { toast.error(data.error || 'Could not send OTP'); return false; }
+      if (user) {
+        setUser(prev => prev ? { ...prev, email: cleanEmail, email_verified: false } : prev);
+      }
+      const res: any = await apiClient.post('/auth/email-otp', { action: 'send', email: cleanEmail });
+      if (!res?.success) { toast.error(res?.message || 'Could not send OTP'); return false; }
       toast.success('OTP sent to ' + cleanEmail);
       return true;
-    } catch { toast.error('Email OTP service unavailable'); return false; }
+    } catch (err: any) { toast.error(err.message || 'Email OTP service unavailable'); return false; }
   }
 
-  // ─── verifyEmailOtp ───────────────────────────────────────────────────────
-  async function verifyEmailOtp(otp: string): Promise<boolean> {
-    if (!user) return false;
+  // ─── verifyEmailOtp (Passwordless Sign In / Sign Up / Account Email Verify) ──
+  async function verifyEmailOtp(otp: string, email?: string, fullName?: string): Promise<boolean> {
     try {
-      const res  = await fetch('/api/email-otp', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'verify', user_id: user.id, otp: otp.trim() }),
+      const cleanEmail = (email || user?.email || '').trim().toLowerCase();
+      const res: any = await apiClient.post('/auth/email-otp', {
+        action:    'verify',
+        otp:       otp.trim(),
+        email:     cleanEmail || undefined,
+        full_name: fullName,
       });
-      const data = await res.json();
-      if (!res.ok || !data.success) { toast.error(data.error || 'Invalid OTP'); return false; }
-      setUser(prev => prev ? { ...prev, email: data.email, email_verified: true } : prev);
+      if (!res?.success) { toast.error(res?.message || 'Invalid OTP'); return false; }
+
+      const returnedUser = res?.data?.user;
+      const returnedToken = res?.data?.token || '';
+      if (returnedUser) {
+        await handleSession({ access_token: returnedToken, user: returnedUser });
+        if (res?.data?.is_new_user && returnedUser.email && !isInternalEmail(returnedUser.email)) {
+          sendEmail(returnedUser.email, 'Welcome to Waves & Wires! 🎉', welcomeEmailHtml(returnedUser.full_name || 'Customer'));
+        }
+      } else if (user) {
+        setUser(prev => prev ? { ...prev, email: res?.data?.email || user.email, email_verified: true } : prev);
+      }
       toast.success('Email verified! ✓');
       return true;
-    } catch { toast.error('Verification failed'); return false; }
+    } catch (err: any) { toast.error(err.message || 'Verification failed'); return false; }
   }
 
-  // ─── sendSmsOtp ───────────────────────────────────────────────────────────
+  // ─── sendSmsOtp (Works for Sign In, Sign Up, and AccountPage verification) ───
   async function sendSmsOtp(phone: string): Promise<boolean> {
     const formatted = normalisePhone(phone);
     try {
-      const res  = await fetch('/api/sms-otp', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'send', phone: formatted }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) { toast.error(data.error || 'Could not send OTP'); return false; }
-      toast.success('OTP sent!');
+      const res: any = await apiClient.post('/auth/sms-otp', { action: 'send', phone: formatted });
+      if (!res?.success) { toast.error(res?.message || 'Could not send OTP'); return false; }
+      toast.success('OTP sent to ' + formatted);
       return true;
-    } catch { toast.error('OTP service unavailable'); return false; }
+    } catch (err: any) { toast.error(err.message || 'OTP service unavailable'); return false; }
   }
 
-  // ─── verifySmsOtp ─────────────────────────────────────────────────────────
-  // REPLACE entire verifySmsOtp function:
-async function verifySmsOtp(phone: string, otp: string, password?: string, fullName?: string): Promise<boolean> {
-  const formatted = normalisePhone(phone);
-  try {
-    const res = await fetch('/api/sms-otp', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'verify',
-        phone: formatted,
-        otp: otp.trim(),
-        user_id: user?.id,
-        password,
+  // ─── verifySmsOtp (Passwordless Sign In / Sign Up / Account Phone Verify) ────
+  async function verifySmsOtp(phone: string, otp: string, _password?: string, fullName?: string): Promise<boolean> {
+    const formatted = normalisePhone(phone);
+    try {
+      const res: any = await apiClient.post('/auth/sms-otp', {
+        action:    'verify',
+        phone:     formatted,
+        otp:       otp.trim(),
+        user_id:   user?.id,
         full_name: fullName,
-      }),
-    });
-    const data = await res.json();
-    if (!res.ok || !data.success) { toast.error(data.error || 'Invalid OTP'); return false; }
-    if (user) {
-      setUser(prev => prev ? { ...prev, phone: formatted, phone_verified: true } : prev);
-    }
-    toast.success('Phone verified! ✓');
-    return true;
-  } catch { toast.error('Verification failed'); return false; }
-}
+      });
+      if (!res?.success) { toast.error(res?.message || 'Invalid OTP'); return false; }
+
+      const returnedUser = res?.data?.user;
+      const returnedToken = res?.data?.token || '';
+      if (returnedUser) {
+        await handleSession({ access_token: returnedToken, user: returnedUser });
+      } else if (user) {
+        setUser(prev => prev ? { ...prev, phone: formatted, phone_verified: true } : prev);
+      }
+      toast.success('Phone verified! ✓');
+      return true;
+    } catch (err: any) { toast.error(err.message || 'Verification failed'); return false; }
+  }
 
   // Legacy aliases
   const sendWhatsAppOtp   = sendSmsOtp;

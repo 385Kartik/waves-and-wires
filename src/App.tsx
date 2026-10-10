@@ -26,21 +26,23 @@ import BlogPage from '@/pages/BlogPage';
 import CareersPage from '@/pages/CareersPage';
 import ScrollToTop from '@/components/ScrollToTop';
 import PaymentCallback from '@/pages/PaymentCallback';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 
 const queryClient = new QueryClient();
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <AuthProvider>
-        <CartProvider>
-          <WishlistProvider>
-            <Sonner />
-            <BrowserRouter>
-            <ScrollToTop />
-              <Routes>
-                <Route element={<Layout />}>
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <AuthProvider>
+          <CartProvider>
+            <WishlistProvider>
+              <Sonner />
+              <BrowserRouter>
+              <ScrollToTop />
+                <Routes>
+                  <Route element={<Layout />}>
                   <Route path="/" element={<HomePage />} />
                   <Route path="/shop" element={<ShopPage />} />
                   <Route path="/product/:slug" element={<ProductDetailPage />} />
@@ -69,6 +71,7 @@ const App = () => (
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;

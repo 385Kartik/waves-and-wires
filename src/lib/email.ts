@@ -96,7 +96,7 @@ interface OrderConfirmParams {
 }
 
 export function orderConfirmHtml(p: OrderConfirmParams): string {
-  const isPaid = p.paymentMethod === 'razorpay';
+  const isPaid = p.paymentMethod === 'phonepe' || p.paymentMethod === 'razorpay';
 
   const itemRows = p.items.map(item => `
     <tr>

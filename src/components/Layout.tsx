@@ -5,7 +5,7 @@ import CartDrawer from '@/components/CartDrawer';
 
 export default function Layout() {
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-screen flex-col bg-[#faf6ed]">
       <Header />
       <main className="flex-1">
         <Outlet />

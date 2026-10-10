@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, CreditCard, Truck, Tag, X, CheckCircle, ChevronRight } from 'lucide-react';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { sendEmail, orderConfirmHtml } from '@/lib/email';
 import { sendSms } from '@/lib/sms';
+import { orderService } from '@/services/order.service';
+import { apiClient } from '@/api/client';
 
 type Step = 'address' | 'payment' | 'confirm';
 type PayMethod = 'cod' | 'phonepe';
@@ -26,10 +27,42 @@ export default function CheckoutPage() {
   const [couponCode,     setCouponCode]     = useState('');
   const [couponApplied,  setCouponApplied]  = useState<{ code: string; discount: number; id: string } | null>(null);
   const [applyingCoupon, setApplyingCoupon] = useState(false);
-  const [address,        setAddress]        = useState({
-    full_name: user?.full_name ?? '', phone: user?.phone ?? '',
-    address_line_1: '', address_line_2: '', city: '', state: '', postal_code: '', country: 'India',
+  const [address,        setAddress]        = useState(() => {
+    try {
+      const saved = localStorage.getItem('ww_checkout_address');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return {
+          full_name: parsed.full_name || user?.full_name || '',
+          phone: parsed.phone || user?.phone || '',
+          address_line_1: parsed.address_line_1 || '',
+          address_line_2: parsed.address_line_2 || '',
+          city: parsed.city || '',
+          state: parsed.state || '',
+          postal_code: parsed.postal_code || '',
+          country: 'India',
+        };
+      }
+    } catch { /* ignore */ }
+    return {
+      full_name: user?.full_name ?? '', phone: user?.phone ?? '',
+      address_line_1: '', address_line_2: '', city: '', state: '', postal_code: '', country: 'India',
+    };
   });
+
+  useEffect(() => {
+    try { localStorage.setItem('ww_checkout_address', JSON.stringify(address)); } catch { /* ignore */ }
+  }, [address]);
+
+  useEffect(() => {
+    if (user) {
+      setAddress(prev => ({
+        ...prev,
+        full_name: prev.full_name || user.full_name || '',
+        phone: prev.phone || user.phone || '',
+      }));
+    }
+  }, [user]);
 
   const shipping = subtotal >= 999 ? 0 : 0;
   const discount = couponApplied?.discount ?? 0;
@@ -40,17 +73,21 @@ export default function CheckoutPage() {
   async function applyCoupon() {
     if (!couponCode.trim()) return;
     setApplyingCoupon(true);
-    const { data, error } = await supabase.from('coupons').select('*')
-      .eq('code', couponCode.toUpperCase().trim()).eq('is_active', true).single();
+    try {
+      const res: any = await apiClient.post('/coupons/validate', { code: couponCode.toUpperCase().trim() });
+      const data = res?.data?.data ?? res?.data;
+      if ((!res?.success && !res?.data?.success) || !data) { toast.error('Invalid or expired coupon'); setApplyingCoupon(false); return; }
+      if (data.expires_at && new Date(data.expires_at) < new Date()) { toast.error('This coupon has expired'); setApplyingCoupon(false); return; }
+      if (data.usage_limit && data.used_count >= data.usage_limit) { toast.error('Coupon usage limit reached'); setApplyingCoupon(false); return; }
+      if (data.min_order_value && subtotal < data.min_order_value) { toast.error(`Min order ₹${data.min_order_value} required`); setApplyingCoupon(false); return; }
+      let d = data.discount_type === 'percentage' ? (subtotal * data.discount_value) / 100 : data.discount_value;
+      if (data.max_discount) d = Math.min(d, data.max_discount);
+      setCouponApplied({ code: data.code, discount: Math.round(d), id: data.id });
+      toast.success(`Coupon applied! You save ₹${Math.round(d)}`);
+    } catch (err: any) {
+      toast.error('Invalid or expired coupon');
+    }
     setApplyingCoupon(false);
-    if (error || !data) { toast.error('Invalid or expired coupon'); return; }
-    if (data.expires_at && new Date(data.expires_at) < new Date()) { toast.error('This coupon has expired'); return; }
-    if (data.usage_limit && data.used_count >= data.usage_limit) { toast.error('Coupon usage limit reached'); return; }
-    if (data.min_order_value && subtotal < data.min_order_value) { toast.error(`Min order ₹${data.min_order_value} required`); return; }
-    let d = data.discount_type === 'percentage' ? (subtotal * data.discount_value) / 100 : data.discount_value;
-    if (data.max_discount) d = Math.min(d, data.max_discount);
-    setCouponApplied({ code: data.code, discount: Math.round(d), id: data.id });
-    toast.success(`Coupon applied! You save ₹${Math.round(d)}`);
   }
 
   function validateAddress() {
@@ -63,12 +100,19 @@ export default function CheckoutPage() {
   }
 
   async function saveOrder(paymentMethod: string, paymentStatus: string, paymentRef?: string) {
-    const { data, error } = await supabase.rpc('place_order', {
+    const res: any = await orderService.placeOrder({
       p_user_id:          user!.id,
       p_items:            items.map(item => ({
-        product_id: item.product.id, quantity: item.quantity,
-        price: item.product.price, name: item.product.name,
-        image: item.product.images?.[0] ?? null, sku: item.product.sku ?? null,
+        product_id:    item.product.id,
+        quantity:      item.quantity,
+        price:         item.product.price,
+        product_name:  item.product.name,
+        name:          item.product.name,
+        product_image: item.product.images?.[0] ?? null,
+        image:         item.product.images?.[0] ?? null,
+        product_sku:   item.product.sku ?? null,
+        sku:           item.product.sku ?? null,
+        total:         item.product.price * item.quantity,
       })),
       p_payment_method:   paymentMethod,
       p_payment_status:   paymentStatus,
@@ -82,10 +126,11 @@ export default function CheckoutPage() {
       p_coupon_code:      couponApplied?.code ?? null,
       p_shipping_address: address,
     });
-    if (error) throw new Error(error.message);
-    const result = data as { success: boolean; error?: string; order_number?: string };
-    if (!result.success) throw new Error(result.error ?? 'Failed to place order');
-    return result.order_number!;
+    const result = (res?.data ?? res) as { success?: boolean; error?: string; order_number?: string; id?: string };
+    if (!res?.success && !result?.success && !result?.order_number) {
+      throw new Error(result?.error ?? res?.message ?? 'Failed to place order');
+    }
+    return result.order_number || result.id!;
   }
 
   // Only push COD orders to Shiprocket immediately (payment already guaranteed on delivery).
@@ -125,13 +170,13 @@ export default function CheckoutPage() {
       });
       const srData = await res.json();
       if (srData.order_id) {
-        await supabase.from('orders').update({
+        await apiClient.put(`/orders/${orderNum}`, {
           shiprocket_order_id:    String(srData.order_id),
           shiprocket_shipment_id: srData.shipment_id ? String(srData.shipment_id) : null,
           awb_code:               srData.awb_code    || null,
           courier_name:           srData.courier_name || null,
           status:                 'confirmed',
-        }).eq('order_number', orderNum);
+        });
       }
     } catch (err) {
       console.error('[COD Shiprocket Push] Error:', err);
@@ -141,8 +186,8 @@ export default function CheckoutPage() {
   // ── COD ──────────────────────────────────────────────────────────────────
   async function placeCOD() {
     if (!user) { toast.error('Sign in first'); navigate('/auth'); return; }
-    if (!user.email_verified || !user.phone_verified) {
-      toast.error('Please verify both email and phone before placing orders.');
+    if (!user.phone_verified && !user.email_verified) {
+      toast.error('Please verify your phone number or email before placing orders.');
       navigate('/account');
       return;
     }
@@ -153,9 +198,12 @@ export default function CheckoutPage() {
       await pushCodToShiprocket(orderNum);
       clearCart();
       toast.success('Order placed! Pay on delivery.');
-      sendEmail(user.email, `Order Confirmed — ${orderNum}`,
-        orderConfirmHtml({ name: address.full_name, orderNum, items, subtotal, discount, shipping, tax, total, paymentMethod: 'cod' }));
-      if (user.phone) sendSms(user.phone, 'order_confirm', { orderNum, total })
+      if (user.email && !user.email.endsWith('@ww.internal')) {
+        sendEmail(user.email, `Order Confirmed — ${orderNum}`,
+          orderConfirmHtml({ name: address.full_name, orderNum, items, subtotal, discount, shipping, tax, total, paymentMethod: 'cod' }));
+      }
+      const smsPhone = user.phone || address.phone;
+      if (smsPhone) sendSms(smsPhone, 'order_confirm', { orderNum, total });
       navigate(`/order-tracking?order=${orderNum}`);
     } catch (err: any) {
       toast.error(err.message ?? 'Failed to place order');
@@ -165,8 +213,8 @@ export default function CheckoutPage() {
   // ── PHONEPE ───────────────────────────────────────────────────────────────
   async function placePhonePe() {
     if (!user) { toast.error('Sign in first'); navigate('/auth'); return; }
-    if (!user.email_verified || !user.phone_verified) {
-      toast.error('Please verify both email and phone before placing orders.');
+    if (!user.phone_verified && !user.email_verified) {
+      toast.error('Please verify your phone number or email before placing orders.');
       navigate('/account');
       return;
     }
@@ -193,10 +241,7 @@ export default function CheckoutPage() {
         window.location.href = data.redirectUrl;
       } else {
         // Payment initiation failed — cancel the order we just created
-        await supabase
-          .from('orders')
-          .update({ status: 'cancelled', payment_status: 'failed' })
-          .eq('order_number', orderNum);
+        await apiClient.put(`/orders/${orderNum}`, { status: 'cancelled', payment_status: 'failed' });
         toast.error(data.error || 'PhonePe initiation failed. Please try again.');
       }
     } catch (err: any) {
@@ -210,8 +255,8 @@ export default function CheckoutPage() {
   if (step === 'address') {
     return (
       <div className="container py-8 max-w-2xl">
-        <Link to="/cart" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6">
-          <ArrowLeft className="h-4 w-4" /> Back to Cart
+        <Link to="/" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6">
+          <ArrowLeft className="h-4 w-4" /> Back to Home
         </Link>
         <h1 className="text-2xl font-black text-foreground mb-6">Delivery Address</h1>
         <div className="rounded-2xl border border-border bg-card p-6 space-y-4">
@@ -237,7 +282,7 @@ export default function CheckoutPage() {
               <input className={inputCls} value={address.postal_code} onChange={e => setAddress(p => ({...p, postal_code: e.target.value.replace(/\D/g,'').slice(0,6)}))} placeholder="400001" /></div>
           </div>
           <button onClick={() => { if (validateAddress()) setStep('payment'); }}
-            className="w-full rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground hover:bg-primary/90 transition-all flex items-center justify-center gap-2">
+            className="w-full rounded-full bg-[#ffd814] hover:bg-[#f7ca00] py-3 text-sm font-bold text-zinc-900 border border-[#fcd200] shadow-sm transition-all flex items-center justify-center gap-2">
             Continue to Payment <ChevronRight className="h-4 w-4" />
           </button>
         </div>
@@ -319,7 +364,7 @@ export default function CheckoutPage() {
           <button
             onClick={payMethod === 'cod' ? placeCOD : placePhonePe}
             disabled={placing}
-            className="w-full rounded-xl bg-primary py-3.5 text-sm font-black text-primary-foreground hover:bg-primary/90 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+            className="w-full rounded-full bg-[#ffd814] hover:bg-[#f7ca00] py-3.5 text-sm font-bold text-zinc-900 border border-[#fcd200] shadow-sm hover:shadow transition-all disabled:opacity-50 flex items-center justify-center gap-2">
             {placing ? '…' : payMethod === 'cod' ? '✓ Place Order (COD)' : '🔒 Pay ₹' + total.toLocaleString('en-IN') + ' via PhonePe'}
           </button>
         </div>
