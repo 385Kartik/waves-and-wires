@@ -37,6 +37,7 @@ export default function Header() {
           <a href="/#design" className="hover:text-[#d97706] transition-colors">Design & Quality</a>
           <a href="/#details" className="hover:text-[#d97706] transition-colors">Details</a>
           <a href="/#features" className="hover:text-[#d97706] transition-colors">Features</a>
+          <a href="/#reviews" className="hover:text-[#d97706] transition-colors">Reviews (30)</a>
         </nav>
 
         {/* Right Actions: Purchase Button, Account, Cart & Mobile Menu Toggle */}
@@ -118,6 +119,13 @@ export default function Header() {
               className="px-3 py-2.5 rounded-lg bg-white/80 border border-amber-900/10 hover:border-[#eab308] text-[#1a1714]"
             >
               Features
+            </a>
+            <a
+              href="/#reviews"
+              onClick={() => setMobileMenuOpen(false)}
+              className="col-span-2 px-3 py-2.5 rounded-lg bg-yellow-400/20 border border-[#eab308]/50 hover:border-[#eab308] text-[#1a1714] text-center"
+            >
+              ★ Customer Reviews (30)
             </a>
             <Link
               to={user ? '/account' : '/auth'}

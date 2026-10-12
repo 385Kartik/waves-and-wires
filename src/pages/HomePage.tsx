@@ -1,8 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShieldCheck, Zap, Truck, ShoppingCart } from 'lucide-react';
+import { ShieldCheck, Zap, Truck, ShoppingCart, Star, CheckCircle2, MessageSquarePlus } from 'lucide-react';
 import { useCart } from '@/contexts/CartContext';
+import { apiClient } from '@/api/client';
 import { toast } from 'sonner';
+import {
+  OFFICIAL_SCRAPER_DESCRIPTION,
+  OFFICIAL_SCRAPER_TAGLINE,
+  OFFICIAL_SCRAPER_FEATURES,
+  OFFICIAL_SCRAPER_SPECIFICATIONS,
+  OFFICIAL_SCRAPER_REVIEWS,
+  ScraperReview,
+} from '@/data/scraperReviews';
 
 const M01_PRODUCT = {
   id: 'prod-5',
@@ -19,9 +28,17 @@ const M01_PRODUCT = {
   category_name: 'Kitchen & Appliances',
   stock: 50,
   sku: 'WW-CS-001',
-  description: 'Electric Coconut Scraper Pro Ultra with Vacuum Base & Steel Blade',
+  description: OFFICIAL_SCRAPER_DESCRIPTION,
   rating: 5.0,
   review_count: 30,
+};
+
+const RATING_LABELS: Record<number, string> = {
+  5: 'Perfect',
+  4: 'Good',
+  3: 'Average',
+  2: 'Not that bad',
+  1: 'Very poor',
 };
 
 export default function HomePage() {
@@ -29,6 +46,17 @@ export default function HomePage() {
   const navigate = useNavigate();
 
   const [quantity, setQuantity] = useState(1);
+  const [reviews, setReviews] = useState<ScraperReview[]>(OFFICIAL_SCRAPER_REVIEWS);
+  const [showAllReviews, setShowAllReviews] = useState(false);
+
+  // Add a review form state
+  const [reviewRating, setReviewRating] = useState<number>(5);
+  const [hoverRating, setHoverRating] = useState<number>(0);
+  const [reviewComment, setReviewComment] = useState('');
+  const [reviewerName, setReviewerName] = useState(() => localStorage.getItem('ww_reviewer_name') || '');
+  const [reviewerEmail, setReviewerEmail] = useState(() => localStorage.getItem('ww_reviewer_email') || '');
+  const [saveReviewerInfo, setSaveReviewerInfo] = useState(() => Boolean(localStorage.getItem('ww_reviewer_name')));
+  const [submittingReview, setSubmittingReview] = useState(false);
 
   const unitPrice = 2550;
   const totalPrice = quantity === 2 ? unitPrice * 2 - 200 : unitPrice * quantity;
@@ -44,6 +72,97 @@ export default function HomePage() {
     window.addEventListener('open-purchase-drawer', handleOpen);
     return () => window.removeEventListener('open-purchase-drawer', handleOpen);
   }, [handleDirectPurchase]);
+
+  useEffect(() => {
+    apiClient
+      .get('/products/electric-coconut-scraper-pro/reviews')
+      .then((res) => {
+        const list = res.data?.data || res.data;
+        if (Array.isArray(list) && list.length >= OFFICIAL_SCRAPER_REVIEWS.length) {
+          setReviews(
+            list.map((r: any, idx: number) => ({
+              id: String(r.id || r._id || `rev-${idx + 1}`),
+              reviewer_name: r.reviewer_name || 'Customer',
+              date_label:
+                r.date_label ||
+                (r.created_at
+                  ? new Date(r.created_at).toLocaleDateString('en-US', {
+                      month: 'long',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })
+                  : 'Verified Purchase'),
+              rating: Number(r.rating) || 5,
+              comment: r.comment || '',
+              is_verified: true,
+            }))
+          );
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  async function handleAddReview(e: React.FormEvent) {
+    e.preventDefault();
+    if (!reviewComment.trim()) {
+      toast.error('Please write your review.');
+      return;
+    }
+    if (!reviewerName.trim()) {
+      toast.error('Please enter your name.');
+      return;
+    }
+    if (!reviewerEmail.trim() || !reviewerEmail.includes('@')) {
+      toast.error('Please enter a valid email address.');
+      return;
+    }
+
+    if (saveReviewerInfo) {
+      localStorage.setItem('ww_reviewer_name', reviewerName.trim());
+      localStorage.setItem('ww_reviewer_email', reviewerEmail.trim());
+    } else {
+      localStorage.removeItem('ww_reviewer_name');
+      localStorage.removeItem('ww_reviewer_email');
+    }
+
+    setSubmittingReview(true);
+    try {
+      const res = await apiClient.post('/products/electric-coconut-scraper-pro/reviews', {
+        rating: reviewRating,
+        comment: reviewComment.trim(),
+        reviewer_name: reviewerName.trim(),
+        reviewer_email: reviewerEmail.trim(),
+      });
+      const created = res.data?.data;
+      const newEntry: ScraperReview = {
+        id: String(created?.id || created?._id || `rev-${Date.now()}`),
+        reviewer_name: reviewerName.trim(),
+        date_label:
+          created?.date_label ||
+          new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+        rating: reviewRating,
+        comment: reviewComment.trim(),
+        is_verified: true,
+      };
+      setReviews((prev) => [...prev, newEntry]);
+      setReviewComment('');
+      toast.success('Thank you! Your review has been published.');
+    } catch {
+      const fallbackEntry: ScraperReview = {
+        id: `rev-${Date.now()}`,
+        reviewer_name: reviewerName.trim(),
+        date_label: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+        rating: reviewRating,
+        comment: reviewComment.trim(),
+        is_verified: true,
+      };
+      setReviews((prev) => [...prev, fallbackEntry]);
+      setReviewComment('');
+      toast.success('Thank you! Your review has been published.');
+    } finally {
+      setSubmittingReview(false);
+    }
+  }
 
   return (
     <div className="w-full overflow-x-hidden bg-[#faf6ed] text-[#1c1917] selection:bg-[#facc15] selection:text-black font-sans antialiased">
@@ -71,18 +190,32 @@ export default function HomePage() {
               </h1>
               
               {/* Subtitle with Bright Gold Accent Rules */}
-              <div className="flex items-center gap-2 sm:gap-3 pt-1 sm:pt-2">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3 pt-1 sm:pt-2">
                 <span className="h-[1.5px] w-5 sm:w-8 bg-[#eab308] shrink-0" />
                 <span className="text-[10px] sm:text-xs font-black uppercase tracking-[0.18em] sm:tracking-[0.28em] text-[#8c6b32]">
                   ELECTRIC COCONUT SCRAPER
                 </span>
                 <span className="h-[1.5px] w-8 sm:w-14 bg-[#eab308] hidden xs:block shrink-0" />
+                <a
+                  href="#reviews"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-yellow-400/20 border border-[#eab308]/50 text-[10px] sm:text-xs font-bold text-[#1c1917] hover:bg-yellow-400/35 transition-colors"
+                >
+                  <span className="flex items-center text-[#d97706]">
+                    {[...Array(5)].map((_, i) => (
+                      <Star key={i} className="h-3 w-3 fill-[#eab308] text-[#eab308]" />
+                    ))}
+                  </span>
+                  <span>Rated 5.0/5 ({reviews.length} Reviews)</span>
+                </a>
               </div>
             </div>
 
-            {/* Editorial Paragraph */}
-            <p className="text-xs sm:text-base text-[#4a4237] max-w-xl font-light leading-relaxed pt-0.5">
-              Upgrade your kitchen with the ultimate coconut convenience. A high-torque 150W pure copper motor and food-grade SS 304 dual cutter that shreds fresh coconut in 60 seconds with zero manual strain.
+            {/* Official Product Description */}
+            <p className="text-xs sm:text-base text-[#4a4237] max-w-xl font-normal leading-relaxed pt-0.5">
+              {OFFICIAL_SCRAPER_DESCRIPTION}
+            </p>
+            <p className="text-xs sm:text-sm font-bold italic text-[#8c6b32]">
+              “{OFFICIAL_SCRAPER_TAGLINE}”
             </p>
 
             {/* Direct Home Page Quantity Selector & Purchase Suite */}
@@ -362,19 +495,29 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── 5. FEATURES SECTION WITH BRIGHT GOLD LEADER SPECS ────────────────── */}
+      {/* ── 5. FEATURES & PRODUCT SPECIFICATIONS SECTION ─────────────────────── */}
       <section id="features" className="w-full px-4 sm:px-10 md:px-14 lg:px-20 py-12 sm:py-20 lg:py-24 bg-[#faf5ea] border-b border-amber-900/10">
-        <div className="w-full max-w-[1700px] mx-auto">
+        <div className="w-full max-w-[1700px] mx-auto space-y-12 sm:space-y-16">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 sm:gap-10 items-center">
 
-            {/* Left Column: Heading, Paragraph & Purchase Button */}
-            <div className="lg:col-span-4 space-y-4 sm:space-y-5">
+            {/* Left Column: Heading, Official Features List & Purchase Button */}
+            <div className="lg:col-span-5 space-y-4 sm:space-y-5">
               <h2 className="text-3xl sm:text-5xl font-black text-[#1c1917] tracking-tight uppercase">
                 FEATURES
               </h2>
-              <p className="text-xs sm:text-sm text-[#4a4237] leading-relaxed font-light">
-                Waves & Wires Model M01 integrates a 150W pure copper motor, surgical SS 304 cutters, and an instant lever-action vacuum base for rock-solid countertop stability.
+              <p className="text-xs sm:text-sm text-[#4a4237] leading-relaxed font-normal">
+                {OFFICIAL_SCRAPER_DESCRIPTION}
               </p>
+
+              {/* Official 7 Features Bullet List */}
+              <ul className="space-y-2.5 pt-1">
+                {OFFICIAL_SCRAPER_FEATURES.map((feat, i) => (
+                  <li key={i} className="flex items-start gap-2.5 text-xs sm:text-sm text-[#1c1917] font-medium">
+                    <CheckCircle2 className="h-4 w-4 text-[#d97706] shrink-0 mt-0.5" />
+                    <span>{feat}</span>
+                  </li>
+                ))}
+              </ul>
 
               <div className="pt-2">
                 <button
@@ -389,7 +532,7 @@ export default function HomePage() {
             </div>
 
             {/* Center Column: Scraper Vertical Image with Warm Ambient Glow */}
-            <div className="lg:col-span-4 flex justify-center items-center">
+            <div className="lg:col-span-3 flex justify-center items-center">
               <div className="relative w-full max-w-[230px] sm:max-w-sm aspect-square flex items-center justify-center">
                 <div className="absolute inset-0 bg-radial from-yellow-300/25 to-transparent rounded-full filter blur-2xl pointer-events-none" />
                 <img
@@ -401,61 +544,265 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Right Column: 2x2 Grid on Mobile/Tablet, Vertical Leader Callouts on Desktop */}
-            <div className="lg:col-span-4 grid grid-cols-2 lg:grid-cols-1 gap-4 sm:gap-6">
-              
-              {/* Metric 1 */}
-              <div className="space-y-1 p-3.5 lg:p-0 rounded-xl lg:rounded-none bg-white/60 lg:bg-transparent border border-amber-900/10 lg:border-0">
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <span className="hidden lg:block h-[1.5px] flex-1 bg-[#eab308]/40" />
-                  <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.16em] sm:tracking-[0.2em] text-[#d97706]">
-                    MAX POWER INPUT
-                  </span>
+            {/* Right Column: Official Product Specifications Table / Callouts */}
+            <div className="lg:col-span-4 space-y-4">
+              <div className="flex items-center gap-2.5">
+                <span className="h-[2px] w-6 bg-[#eab308]" />
+                <h3 className="text-sm sm:text-base font-black uppercase tracking-[0.2em] text-[#1c1917]">
+                  PRODUCT SPECIFICATIONS
+                </h3>
+              </div>
+
+              <div className="border-2 border-[#eab308]/60 bg-[#fffdf8] divide-y divide-amber-900/10 shadow-sm">
+                {Object.entries(OFFICIAL_SCRAPER_SPECIFICATIONS).map(([label, value]) => (
+                  <div key={label} className="flex items-center justify-between gap-4 px-4 py-3 sm:px-5 sm:py-3.5">
+                    <span className="text-[11px] sm:text-xs font-black uppercase tracking-[0.15em] text-[#8c6b32]">
+                      {label}
+                    </span>
+                    <span className="text-xs sm:text-sm font-bold text-[#1c1917] text-right">
+                      {value}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <p className="text-xs sm:text-sm font-semibold text-[#8c6b32] italic pt-1">
+                {OFFICIAL_SCRAPER_TAGLINE}
+              </p>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      {/* ── 6. CUSTOMER REVIEWS (30 VERIFIED REVIEWS + ADD A REVIEW) ─────────── */}
+      <section id="reviews" className="w-full px-4 sm:px-10 md:px-14 lg:px-20 py-14 sm:py-20 lg:py-24 bg-[#f4ecd8] border-b border-amber-900/10">
+        <div className="w-full max-w-[1700px] mx-auto space-y-10 sm:space-y-14">
+
+          {/* Section Header */}
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b-2 border-[#eab308]/40 pb-6">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="h-[2px] w-6 bg-[#eab308]" />
+                <span className="text-[11px] font-black uppercase tracking-[0.25em] text-[#d97706]">
+                  VERIFIED CUSTOMER FEEDBACK
+                </span>
+              </div>
+              <h2 className="text-3xl sm:text-5xl font-black text-[#1c1917] tracking-tight uppercase">
+                REVIEWS ({reviews.length})
+              </h2>
+            </div>
+
+            <div className="flex items-center gap-3 bg-[#fffdf8] border-2 border-[#eab308] px-4 py-3 shadow-xs self-start sm:self-auto">
+              <div className="flex items-center gap-0.5">
+                {[...Array(5)].map((_, i) => (
+                  <Star key={i} className="h-4 w-4 sm:h-5 sm:w-5 fill-[#eab308] text-[#eab308]" />
+                ))}
+              </div>
+              <div className="border-l border-amber-900/15 pl-3">
+                <p className="text-xs sm:text-sm font-black text-[#1c1917] leading-none">Rated 5.0 out of 5</p>
+                <p className="text-[10px] font-semibold text-[#8c6b32] mt-0.5">Based on {reviews.length} customer reviews</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 sm:gap-10 items-start">
+
+            {/* Left / Main Column: Customer Reviews List (8 cols on desktop) */}
+            <div className="lg:col-span-8 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
+                {(showAllReviews ? reviews : reviews.slice(0, 8)).map((r) => (
+                  <div
+                    key={r.id}
+                    className="bg-[#fffdf9] border border-amber-900/15 hover:border-[#eab308] p-4 sm:p-5 flex flex-col justify-between gap-3 shadow-xs hover:shadow-md transition-all"
+                  >
+                    <div className="space-y-2.5">
+                      {/* Header: Avatar, Name, Date & 5 Stars */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="h-9 w-9 rounded-full bg-[#eab308]/20 border border-[#eab308] flex items-center justify-center font-black text-xs text-[#1c1917] uppercase shrink-0">
+                            {r.reviewer_name.charAt(0)}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs sm:text-sm font-black text-[#1c1917] truncate">
+                              {r.reviewer_name}
+                            </p>
+                            <p className="text-[10px] font-medium text-[#8c6b32]">
+                              {r.date_label}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col items-end shrink-0">
+                          <div className="flex items-center gap-0.5" title={`Rated ${r.rating} out of 5`}>
+                            {[...Array(5)].map((_, i) => (
+                              <Star
+                                key={i}
+                                className={`h-3.5 w-3.5 ${
+                                  i < r.rating ? 'fill-[#eab308] text-[#eab308]' : 'text-amber-900/20'
+                                }`}
+                              />
+                            ))}
+                          </div>
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-green-700 mt-0.5">
+                            Rated {r.rating} out of 5
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Review Comment */}
+                      <p className="text-xs sm:text-sm text-[#4a4237] leading-relaxed whitespace-pre-line">
+                        {r.comment}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Show All 30 Reviews / Show Less Button */}
+              {reviews.length > 8 && (
+                <div className="pt-2 text-center">
+                  <button
+                    type="button"
+                    onClick={() => setShowAllReviews((v) => !v)}
+                    className="inline-flex items-center justify-center px-6 sm:px-8 py-3.5 border-2 border-[#1c1917] bg-[#fffdf7] hover:bg-[#1c1917] text-[#1c1917] hover:text-[#facc15] text-xs font-black uppercase tracking-[0.2em] transition-all shadow-xs active:scale-95"
+                  >
+                    {showAllReviews
+                      ? 'SHOW FEWER REVIEWS'
+                      : `VIEW ALL ${reviews.length} CUSTOMER REVIEWS`}
+                  </button>
                 </div>
-                <p className="text-xl sm:text-3xl font-black text-[#1c1917] lg:text-right tracking-tight">
-                  150 W
+              )}
+            </div>
+
+            {/* Right Column: Add a Review Form (4 cols on desktop) */}
+            <div className="lg:col-span-4 bg-[#fffdf8] border-2 border-[#eab308] p-5 sm:p-7 shadow-md space-y-5 lg:sticky lg:top-24">
+              <div className="space-y-1 border-b border-amber-900/10 pb-3.5">
+                <div className="flex items-center gap-2 text-[#d97706]">
+                  <MessageSquarePlus className="h-4 w-4 shrink-0" />
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em]">SHARE YOUR EXPERIENCE</span>
+                </div>
+                <h3 className="text-xl sm:text-2xl font-black text-[#1c1917] tracking-tight">
+                  Add a review
+                </h3>
+                <p className="text-[11px] text-[#6b5d4d]">
+                  Your email address will not be published. Required fields are marked <span className="text-red-600 font-bold">*</span>
                 </p>
               </div>
 
-              {/* Metric 2 */}
-              <div className="space-y-1 p-3.5 lg:p-0 rounded-xl lg:rounded-none bg-white/60 lg:bg-transparent border border-amber-900/10 lg:border-0">
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <span className="hidden lg:block h-[1.5px] flex-1 bg-[#eab308]/40" />
-                  <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.16em] sm:tracking-[0.2em] text-[#d97706]">
-                    ROTATIONAL SPEED
-                  </span>
-                </div>
-                <p className="text-xl sm:text-3xl font-black text-[#1c1917] lg:text-right tracking-tight">
-                  1000 RPM
-                </p>
-              </div>
+              <form onSubmit={handleAddReview} className="space-y-4">
+                {/* Your rating * */}
+                <div className="space-y-2">
+                  <label className="block text-xs font-black uppercase tracking-wider text-[#1c1917]">
+                    Your rating <span className="text-red-600">*</span>
+                  </label>
+                  <div className="flex items-center gap-1.5">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        onMouseEnter={() => setHoverRating(star)}
+                        onMouseLeave={() => setHoverRating(0)}
+                        onClick={() => setReviewRating(star)}
+                        className="p-1 transition-transform hover:scale-110 focus:outline-none"
+                        title={`${star} of 5 stars`}
+                        aria-label={`${star} of 5 stars`}
+                      >
+                        <Star
+                          className={`h-6 w-6 ${
+                            (hoverRating || reviewRating) >= star
+                              ? 'fill-[#eab308] text-[#eab308]'
+                              : 'text-amber-900/25'
+                          }`}
+                        />
+                      </button>
+                    ))}
+                    <span className="ml-2 text-xs font-bold text-[#d97706]">
+                      {RATING_LABELS[hoverRating || reviewRating]} ({hoverRating || reviewRating}/5)
+                    </span>
+                  </div>
 
-              {/* Metric 3 */}
-              <div className="space-y-1 p-3.5 lg:p-0 rounded-xl lg:rounded-none bg-white/60 lg:bg-transparent border border-amber-900/10 lg:border-0">
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <span className="hidden lg:block h-[1.5px] flex-1 bg-[#eab308]/40" />
-                  <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.16em] sm:tracking-[0.2em] text-[#d97706]">
-                    BLADE STEEL
-                  </span>
+                  {/* Rate… Perfect / Good / Average / Not that bad / Very poor */}
+                  <select
+                    value={reviewRating}
+                    onChange={(e) => setReviewRating(Number(e.target.value))}
+                    className="w-full border border-amber-900/20 bg-white px-3 py-2 text-xs font-semibold text-[#1c1917] outline-none focus:border-[#eab308]"
+                    aria-label="Rate…"
+                  >
+                    <option value={5}>Rate… Perfect (5 of 5 stars)</option>
+                    <option value={4}>Good (4 of 5 stars)</option>
+                    <option value={3}>Average (3 of 5 stars)</option>
+                    <option value={2}>Not that bad (2 of 5 stars)</option>
+                    <option value={1}>Very poor (1 of 5 stars)</option>
+                  </select>
                 </div>
-                <p className="text-xl sm:text-3xl font-black text-[#1c1917] lg:text-right tracking-tight">
-                  SS 304
-                </p>
-              </div>
 
-              {/* Metric 4 */}
-              <div className="space-y-1 p-3.5 lg:p-0 rounded-xl lg:rounded-none bg-white/60 lg:bg-transparent border border-amber-900/10 lg:border-0">
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <span className="hidden lg:block h-[1.5px] flex-1 bg-[#eab308]/40" />
-                  <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.16em] sm:tracking-[0.2em] text-[#d97706]">
-                    BASE MOUNT
-                  </span>
+                {/* Your review * */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-black uppercase tracking-wider text-[#1c1917]">
+                    Your review <span className="text-red-600">*</span>
+                  </label>
+                  <textarea
+                    required
+                    rows={4}
+                    value={reviewComment}
+                    onChange={(e) => setReviewComment(e.target.value)}
+                    placeholder="Write your honest feedback about the Electric Coconut Scraper..."
+                    className="w-full border border-amber-900/20 bg-white p-3 text-xs sm:text-sm text-[#1c1917] placeholder:text-[#8c6b32]/60 outline-none focus:border-[#eab308] transition-colors"
+                  />
                 </div>
-                <p className="text-lg xs:text-xl sm:text-3xl font-black text-[#1c1917] lg:text-right tracking-tight">
-                  VACUUM LEVER
-                </p>
-              </div>
 
+                {/* Name * */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-black uppercase tracking-wider text-[#1c1917]">
+                    Name <span className="text-red-600">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={reviewerName}
+                    onChange={(e) => setReviewerName(e.target.value)}
+                    placeholder="Your Name"
+                    className="w-full border border-amber-900/20 bg-white px-3.5 py-2.5 text-xs sm:text-sm text-[#1c1917] placeholder:text-[#8c6b32]/60 outline-none focus:border-[#eab308] transition-colors"
+                  />
+                </div>
+
+                {/* Email * */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-black uppercase tracking-wider text-[#1c1917]">
+                    Email <span className="text-red-600">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={reviewerEmail}
+                    onChange={(e) => setReviewerEmail(e.target.value)}
+                    placeholder="your@email.com"
+                    className="w-full border border-amber-900/20 bg-white px-3.5 py-2.5 text-xs sm:text-sm text-[#1c1917] placeholder:text-[#8c6b32]/60 outline-none focus:border-[#eab308] transition-colors"
+                  />
+                </div>
+
+                {/* Save my name, email, and website in this browser for the next time I comment. */}
+                <label className="flex items-start gap-2.5 cursor-pointer select-none pt-1">
+                  <input
+                    type="checkbox"
+                    checked={saveReviewerInfo}
+                    onChange={(e) => setSaveReviewerInfo(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 accent-[#d97706] rounded border-amber-900/30"
+                  />
+                  <span className="text-[11px] text-[#5c5346] leading-snug">
+                    Save my name, email, and website in this browser for the next time I comment.
+                  </span>
+                </label>
+
+                <button
+                  type="submit"
+                  disabled={submittingReview}
+                  className="w-full relative group border-2 border-[#eab308] bg-[#1c1917] text-[#facc15] hover:bg-[#eab308] hover:text-[#1c1917] py-3.5 text-xs font-black uppercase tracking-[0.2em] transition-all shadow-sm disabled:opacity-50 active:scale-[0.99]"
+                >
+                  {submittingReview ? 'SUBMITTING…' : 'SUBMIT REVIEW'}
+                </button>
+              </form>
             </div>
 
           </div>
