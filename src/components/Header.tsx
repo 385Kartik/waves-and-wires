@@ -22,17 +22,17 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-50 bg-[#faf7f0]/95 backdrop-blur-md border-b border-amber-900/10 transition-all shadow-xs">
-      <div className="w-full max-w-[1700px] mx-auto px-4 sm:px-10 lg:px-14 h-14 sm:h-20 flex items-center justify-between">
+      <div className="w-full max-w-[1700px] mx-auto px-3 xs:px-4 sm:px-10 lg:px-14 h-14 sm:h-20 flex items-center justify-between gap-2">
         
         {/* Brand Logo / Wordmark in Serif Italic Bright Gold Yellow */}
         <Link to="/" className="flex items-center gap-1 group shrink-0">
-          <span className="font-serif italic text-xl sm:text-3xl text-[#1a1714] font-normal tracking-tight group-hover:text-[#d97706] transition-colors">
+          <span className="font-serif italic text-lg xs:text-xl sm:text-3xl text-[#1a1714] font-normal tracking-tight group-hover:text-[#d97706] transition-colors">
             Waves <span className="font-serif italic text-[#d97706] group-hover:text-[#eab308]">Wires</span>
           </span>
         </Link>
 
         {/* Minimal Nav Anchor Links (Desktop) */}
-        <nav className="hidden md:flex items-center gap-8 text-[11px] font-bold uppercase tracking-[0.2em] text-[#6b5d4d]">
+        <nav className="hidden md:flex items-center gap-6 lg:gap-8 text-[11px] font-bold uppercase tracking-[0.2em] text-[#6b5d4d]">
           <a href="/#overview" className="hover:text-[#d97706] transition-colors">Overview</a>
           <a href="/#design" className="hover:text-[#d97706] transition-colors">Design & Quality</a>
           <a href="/#details" className="hover:text-[#d97706] transition-colors">Details</a>
@@ -40,13 +40,13 @@ export default function Header() {
         </nav>
 
         {/* Right Actions: Purchase Button, Account, Cart & Mobile Menu Toggle */}
-        <div className="flex items-center gap-2 sm:gap-4">
+        <div className="flex items-center gap-1 xs:gap-2 sm:gap-4 shrink-0">
           <button
             onClick={handleHeaderPurchase}
-            className="group relative inline-flex items-center border-2 border-[#eab308] bg-[#fffdf7] hover:bg-[#1a1714] text-[#1a1714] hover:text-[#facc15] px-3 sm:px-6 py-1.5 sm:py-2.5 text-[10px] sm:text-[11px] font-extrabold uppercase tracking-[0.14em] sm:tracking-[0.18em] transition-all shadow-xs hover:shadow-md"
+            className="group relative inline-flex items-center border-2 border-[#eab308] bg-[#fffdf7] hover:bg-[#1a1714] text-[#1a1714] hover:text-[#facc15] px-2.5 xs:px-3 sm:px-6 py-1.5 sm:py-2.5 text-[9px] xs:text-[10px] sm:text-[11px] font-extrabold uppercase tracking-[0.08em] xs:tracking-[0.14em] sm:tracking-[0.18em] transition-all shadow-xs hover:shadow-md whitespace-nowrap"
           >
             <span>PURCHASE</span>
-            <span className="ml-1.5 sm:ml-2 text-[#d97706] group-hover:text-[#facc15] font-black text-[10px] sm:text-[11px]">₹2,550</span>
+            <span className="ml-1 xs:ml-1.5 sm:ml-2 text-[#d97706] group-hover:text-[#facc15] font-black text-[9px] xs:text-[10px] sm:text-[11px]">₹2,550</span>
             {/* Folded corner triangle decoration in bright gold yellow */}
             <span className="absolute bottom-0 right-0 w-2 h-2 sm:w-2.5 sm:h-2.5 bg-[#eab308] [clip-path:polygon(100%_0,0_100%,100%_100%)]" />
           </button>
@@ -89,36 +89,50 @@ export default function Header() {
 
       {/* Mobile Dropdown Navigation */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-[#faf7f0] border-b border-amber-900/10 px-4 py-4 space-y-3 animate-in slide-in-from-top-2 duration-150">
-          <div className="grid grid-cols-2 gap-2 text-[11px] font-bold uppercase tracking-[0.15em] text-[#6b5d4d]">
+        <div className="md:hidden bg-[#faf7f0] border-b border-amber-900/10 px-4 py-4 space-y-3 animate-in slide-in-from-top-2 duration-150 shadow-lg">
+          <div className="grid grid-cols-2 gap-2 text-[11px] font-bold uppercase tracking-[0.12em] text-[#6b5d4d]">
             <a
-              href="#overview"
+              href="/#overview"
               onClick={() => setMobileMenuOpen(false)}
-              className="px-3 py-2.5 rounded-lg bg-white/70 border border-amber-900/10 hover:border-[#eab308] text-[#1a1714]"
+              className="px-3 py-2.5 rounded-lg bg-white/80 border border-amber-900/10 hover:border-[#eab308] text-[#1a1714]"
             >
               Overview
             </a>
             <a
-              href="#design"
+              href="/#design"
               onClick={() => setMobileMenuOpen(false)}
-              className="px-3 py-2.5 rounded-lg bg-white/70 border border-amber-900/10 hover:border-[#eab308] text-[#1a1714]"
+              className="px-3 py-2.5 rounded-lg bg-white/80 border border-amber-900/10 hover:border-[#eab308] text-[#1a1714]"
             >
               Design & Quality
             </a>
             <a
-              href="#details"
+              href="/#details"
               onClick={() => setMobileMenuOpen(false)}
-              className="px-3 py-2.5 rounded-lg bg-white/70 border border-amber-900/10 hover:border-[#eab308] text-[#1a1714]"
+              className="px-3 py-2.5 rounded-lg bg-white/80 border border-amber-900/10 hover:border-[#eab308] text-[#1a1714]"
             >
               Details
             </a>
             <a
-              href="#features"
+              href="/#features"
               onClick={() => setMobileMenuOpen(false)}
-              className="px-3 py-2.5 rounded-lg bg-white/70 border border-amber-900/10 hover:border-[#eab308] text-[#1a1714]"
+              className="px-3 py-2.5 rounded-lg bg-white/80 border border-amber-900/10 hover:border-[#eab308] text-[#1a1714]"
             >
               Features
             </a>
+            <Link
+              to={user ? '/account' : '/auth'}
+              onClick={() => setMobileMenuOpen(false)}
+              className="px-3 py-2.5 rounded-lg bg-white/80 border border-amber-900/10 hover:border-[#eab308] text-[#1a1714]"
+            >
+              {user ? 'My Account' : 'Sign In / OTP'}
+            </Link>
+            <Link
+              to="/order-tracking"
+              onClick={() => setMobileMenuOpen(false)}
+              className="px-3 py-2.5 rounded-lg bg-white/80 border border-amber-900/10 hover:border-[#eab308] text-[#1a1714]"
+            >
+              Track Order
+            </Link>
           </div>
         </div>
       )}

@@ -11,15 +11,15 @@ export default function CartDrawer() {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex">
+    <div className="fixed inset-0 z-50 flex justify-end">
       {/* Backdrop */}
-      <div className="flex-1 bg-black/50 backdrop-blur-sm" onClick={() => setIsOpen(false)} />
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsOpen(false)} />
 
       {/* Drawer */}
-      <div className="flex w-full max-w-[360px] flex-col bg-[#fafaf8] shadow-2xl">
+      <div className="relative z-10 flex w-[92vw] max-w-[370px] h-full flex-col bg-[#fafaf8] shadow-2xl">
 
         {/* ── Header ───────────────────────────────── */}
-        <div className="flex items-center justify-between px-5 py-4 bg-white border-b border-stone-100">
+        <div className="flex items-center justify-between px-4 sm:px-5 py-4 bg-white border-b border-stone-100">
           <div className="flex items-center gap-3">
             <div className="relative">
               <div className="h-9 w-9 rounded-2xl bg-amber-400 flex items-center justify-center shadow-sm">
@@ -46,7 +46,7 @@ export default function CartDrawer() {
 
         {/* ── Free shipping bar ─────────────────────── */}
         {itemCount > 0 && (
-          <div className="px-5 py-3.5 bg-white border-b border-stone-100">
+          <div className="px-4 sm:px-5 py-3.5 bg-white border-b border-stone-100">
             {shipping === 0 ? (
               <div className="flex items-center gap-2">
                 <div className="h-5 w-5 rounded-full bg-green-100 flex items-center justify-center shrink-0">
@@ -84,15 +84,15 @@ export default function CartDrawer() {
               </div>
               <div>
                 <p className="font-black text-stone-900 text-base">Nothing here yet</p>
-                <p className="text-sm text-stone-400 mt-1">Add something awesome to get started</p>
+                <p className="text-sm text-stone-400 mt-1">Add Model M01 to get started</p>
               </div>
-              <Link to="/shop" onClick={() => setIsOpen(false)}
+              <Link to="/" onClick={() => setIsOpen(false)}
                 className="rounded-2xl bg-stone-900 px-6 py-2.5 text-sm font-bold text-white hover:bg-stone-700 transition-all">
-                Browse Products
+                View Model M01
               </Link>
             </div>
           ) : (
-            <div className="p-4 space-y-3">
+            <div className="p-3.5 sm:p-4 space-y-3">
               {items.map(item => {
                 const atMax = item.quantity >= item.product.stock;
                 return (
@@ -100,7 +100,7 @@ export default function CartDrawer() {
                     className="group bg-white rounded-2xl border border-stone-100 p-3 hover:border-amber-200 hover:shadow-sm transition-all duration-200">
                     <div className="flex gap-3">
                       {/* Image */}
-                      <div className="h-[72px] w-[72px] shrink-0 rounded-xl overflow-hidden bg-stone-50 border border-stone-100">
+                      <div className="h-[68px] w-[68px] sm:h-[72px] sm:w-[72px] shrink-0 rounded-xl overflow-hidden bg-stone-50 border border-stone-100">
                         <img
                           src={item.product.images?.[0]}
                           alt={item.product.name}
@@ -115,7 +115,8 @@ export default function CartDrawer() {
                             {item.product.name}
                           </p>
                           <button onClick={() => removeItem(item.product.id)}
-                            className="shrink-0 h-6 w-6 rounded-lg flex items-center justify-center text-stone-300 hover:bg-red-50 hover:text-red-400 transition-all opacity-0 group-hover:opacity-100">
+                            aria-label="Remove item"
+                            className="shrink-0 h-6 w-6 rounded-lg flex items-center justify-center text-stone-400 hover:bg-red-50 hover:text-red-500 transition-all opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         </div>

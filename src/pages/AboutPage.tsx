@@ -138,14 +138,7 @@ export default function AboutPage() {
                   </div>
                   <div className="absolute left-5 sm:left-1/2 sm:-translate-x-1/2 h-4 w-4 rounded-full bg-primary border-2 border-background shadow-sm mt-1" />
                   <div className={`flex-1 pl-14 sm:pl-0 ${i % 2 !== 0 ? 'sm:pr-8 sm:text-right' : 'sm:pl-8'}`}>
-                    {/* Mobile always shows, desktop shows only odd */}
-                    <div className={`sm:${i % 2 === 0 ? 'hidden' : 'inline-block'} bg-card border border-border rounded-2xl p-4`}>
-                      <p className="font-black text-primary text-sm">{m.year}</p>
-                      <p className="font-bold text-foreground text-sm mt-1">{m.title}</p>
-                      <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{m.desc}</p>
-                    </div>
-                    {/* Mobile fallback for even items */}
-                    <div className="sm:hidden bg-card border border-border rounded-2xl p-4">
+                    <div className={`${i % 2 === 0 ? 'sm:hidden' : 'sm:inline-block'} bg-card border border-border rounded-2xl p-4 text-left`}>
                       <p className="font-black text-primary text-sm">{m.year}</p>
                       <p className="font-bold text-foreground text-sm mt-1">{m.title}</p>
                       <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{m.desc}</p>

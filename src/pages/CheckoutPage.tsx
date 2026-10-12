@@ -254,23 +254,23 @@ export default function CheckoutPage() {
   // ── Address step ──────────────────────────────────────────────────────────
   if (step === 'address') {
     return (
-      <div className="container py-8 max-w-2xl">
-        <Link to="/" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6">
+      <div className="container py-6 sm:py-8 max-w-2xl">
+        <Link to="/" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-5 sm:mb-6">
           <ArrowLeft className="h-4 w-4" /> Back to Home
         </Link>
-        <h1 className="text-2xl font-black text-foreground mb-6">Delivery Address</h1>
-        <div className="rounded-2xl border border-border bg-card p-6 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <h1 className="text-xl sm:text-2xl font-black text-foreground mb-5 sm:mb-6">Delivery Address</h1>
+        <div className="rounded-2xl border border-border bg-card p-4 sm:p-6 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
             <div><label className="text-xs font-semibold text-muted-foreground mb-1.5 block">Full Name *</label>
               <input className={inputCls} value={address.full_name} onChange={e => setAddress(p => ({...p, full_name: e.target.value}))} placeholder="Rahul Sharma" /></div>
             <div><label className="text-xs font-semibold text-muted-foreground mb-1.5 block">Phone *</label>
-              <input className={inputCls} value={address.phone} onChange={e => setAddress(p => ({...p, phone: e.target.value}))} placeholder="9876543210" /></div>
+              <input type="tel" inputMode="numeric" maxLength={10} className={inputCls} value={address.phone} onChange={e => setAddress(p => ({...p, phone: e.target.value.replace(/\D/g, '').slice(0, 10)}))} placeholder="9876543210" /></div>
           </div>
           <div><label className="text-xs font-semibold text-muted-foreground mb-1.5 block">Address Line 1 *</label>
             <input className={inputCls} value={address.address_line_1} onChange={e => setAddress(p => ({...p, address_line_1: e.target.value}))} placeholder="House / Flat / Block No." /></div>
           <div><label className="text-xs font-semibold text-muted-foreground mb-1.5 block">Address Line 2</label>
             <input className={inputCls} value={address.address_line_2} onChange={e => setAddress(p => ({...p, address_line_2: e.target.value}))} placeholder="Street, Area, Landmark (optional)" /></div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 sm:gap-4">
             <div><label className="text-xs font-semibold text-muted-foreground mb-1.5 block">City *</label>
               <input className={inputCls} value={address.city} onChange={e => setAddress(p => ({...p, city: e.target.value}))} placeholder="Mumbai" /></div>
             <div><label className="text-xs font-semibold text-muted-foreground mb-1.5 block">State *</label>
@@ -279,10 +279,10 @@ export default function CheckoutPage() {
                 {STATES.map(s => <option key={s} value={s}>{s}</option>)}
               </select></div>
             <div><label className="text-xs font-semibold text-muted-foreground mb-1.5 block">Pincode *</label>
-              <input className={inputCls} value={address.postal_code} onChange={e => setAddress(p => ({...p, postal_code: e.target.value.replace(/\D/g,'').slice(0,6)}))} placeholder="400001" /></div>
+              <input type="tel" inputMode="numeric" maxLength={6} className={inputCls} value={address.postal_code} onChange={e => setAddress(p => ({...p, postal_code: e.target.value.replace(/\D/g,'').slice(0,6)}))} placeholder="400001" /></div>
           </div>
           <button onClick={() => { if (validateAddress()) setStep('payment'); }}
-            className="w-full rounded-full bg-[#ffd814] hover:bg-[#f7ca00] py-3 text-sm font-bold text-zinc-900 border border-[#fcd200] shadow-sm transition-all flex items-center justify-center gap-2">
+            className="w-full rounded-full bg-[#ffd814] hover:bg-[#f7ca00] py-3.5 text-sm font-bold text-zinc-900 border border-[#fcd200] shadow-sm transition-all flex items-center justify-center gap-2">
             Continue to Payment <ChevronRight className="h-4 w-4" />
           </button>
         </div>
@@ -293,18 +293,18 @@ export default function CheckoutPage() {
   // ── Payment step ──────────────────────────────────────────────────────────
   if (step === 'payment') {
     return (
-      <div className="container py-8 max-w-2xl">
-        <button onClick={() => setStep('address')} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6">
-          <ArrowLeft className="h-4 w-4" /> Back
+      <div className="container py-6 sm:py-8 max-w-2xl">
+        <button onClick={() => setStep('address')} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-5 sm:mb-6">
+          <ArrowLeft className="h-4 w-4" /> Back to Address
         </button>
-        <h1 className="text-2xl font-black text-foreground mb-6">Payment Method</h1>
+        <h1 className="text-xl sm:text-2xl font-black text-foreground mb-5 sm:mb-6">Payment Method</h1>
         <div className="space-y-4">
-          <div className="rounded-2xl border border-border bg-card p-6 space-y-3">
+          <div className="rounded-2xl border border-border bg-card p-4 sm:p-6 space-y-3">
             {[
               { id: 'phonepe' as PayMethod, icon: CreditCard, label: 'Pay Online', sub: 'UPI, Cards, Net Banking via PhonePe' },
               { id: 'cod'     as PayMethod, icon: Truck,       label: 'Cash on Delivery', sub: 'Pay when your order arrives' },
             ].map(({ id, icon: Icon, label, sub }) => (
-              <label key={id} className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${
+              <label key={id} className={`flex items-center gap-3 p-3.5 sm:p-4 rounded-xl border cursor-pointer transition-all ${
                 payMethod === id ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'
               }`}>
                 <input type="radio" name="pay" value={id} checked={payMethod === id} onChange={() => setPayMethod(id)} className="sr-only" />
@@ -314,25 +314,25 @@ export default function CheckoutPage() {
                   {payMethod === id && <div className="h-2.5 w-2.5 rounded-full bg-primary" />}
                 </div>
                 <Icon className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                <div><p className="text-sm font-semibold text-foreground">{label}</p><p className="text-xs text-muted-foreground">{sub}</p></div>
+                <div className="min-w-0"><p className="text-sm font-semibold text-foreground">{label}</p><p className="text-xs text-muted-foreground">{sub}</p></div>
               </label>
             ))}
           </div>
 
           {/* Coupon */}
-          <div className="rounded-2xl border border-border bg-card p-5">
+          <div className="rounded-2xl border border-border bg-card p-4 sm:p-5">
             <p className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2"><Tag className="h-4 w-4" /> Coupon Code</p>
             {couponApplied ? (
               <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-4 py-2.5">
                 <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
-                <span className="text-sm font-semibold text-green-700 flex-1">{couponApplied.code} — ₹{couponApplied.discount} off</span>
-                <button onClick={() => setCouponApplied(null)} className="text-green-600 hover:text-green-800"><X className="h-4 w-4" /></button>
+                <span className="text-sm font-semibold text-green-700 flex-1 truncate">{couponApplied.code} — ₹{couponApplied.discount} off</span>
+                <button onClick={() => setCouponApplied(null)} className="text-green-600 hover:text-green-800 shrink-0"><X className="h-4 w-4" /></button>
               </div>
             ) : (
               <div className="flex gap-2">
-                <input className={inputCls} value={couponCode} onChange={e => setCouponCode(e.target.value.toUpperCase())} placeholder="ENTER CODE" />
+                <input className={`${inputCls} min-w-0 flex-1`} value={couponCode} onChange={e => setCouponCode(e.target.value.toUpperCase())} placeholder="ENTER CODE" />
                 <button onClick={applyCoupon} disabled={applyingCoupon}
-                  className="rounded-xl bg-secondary border border-border px-4 py-2.5 text-sm font-semibold text-foreground hover:bg-accent disabled:opacity-50">
+                  className="shrink-0 rounded-xl bg-secondary border border-border px-4 py-2.5 text-sm font-semibold text-foreground hover:bg-accent disabled:opacity-50">
                   {applyingCoupon ? '…' : 'Apply'}
                 </button>
               </div>
@@ -340,7 +340,7 @@ export default function CheckoutPage() {
           </div>
 
           {/* Order Summary */}
-          <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
+          <div className="rounded-2xl border border-border bg-card p-4 sm:p-5 space-y-3">
             <p className="text-sm font-bold text-foreground">Order Summary</p>
             {[
               { label: 'Subtotal', val: subtotal },

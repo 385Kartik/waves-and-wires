@@ -46,18 +46,18 @@ export default function ShopPage() {
 
   return (
     <div className="container py-8 max-w-7xl">
-      <div className="mb-6 flex items-center justify-between gap-4">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground">
             {categoryFilter ? categories.find(c => c.slug === categoryFilter)?.name ?? 'Products' : searchQuery ? `"${searchQuery}"` : 'All Products'}
           </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">{loading ? '…' : `${products.length} products`}</p>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">{loading ? '…' : `${products.length} products`}</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <select
             value={sortBy}
             onChange={e => setSortBy(e.target.value)}
-            className="rounded-xl border border-input bg-secondary px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer"
+            className="rounded-xl border border-input bg-secondary px-2.5 sm:px-3 py-2 text-xs sm:text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer"
           >
             <option value="newest">Newest</option>
             <option value="price-asc">Price: Low → High</option>
@@ -66,16 +66,16 @@ export default function ShopPage() {
           </select>
           <button
             onClick={() => setShowFilters(v => !v)}
-            className="flex items-center gap-2 rounded-xl border border-input bg-secondary px-3.5 py-2 text-sm font-semibold hover:bg-accent transition-colors"
+            className="flex items-center gap-1.5 sm:gap-2 rounded-xl border border-input bg-secondary px-3 sm:px-3.5 py-2 text-xs sm:text-sm font-semibold hover:bg-accent transition-colors lg:hidden"
           >
             <SlidersHorizontal className="h-4 w-4" /> Filters
           </button>
         </div>
       </div>
 
-      <div className="flex gap-6">
+      <div className="flex flex-col lg:flex-row gap-6">
         {/* Sidebar filters */}
-        <aside className={`${showFilters ? 'block' : 'hidden'} lg:block w-60 shrink-0 space-y-6`}>
+        <aside className={`${showFilters ? 'block' : 'hidden'} lg:block w-full lg:w-60 shrink-0 space-y-6`}>
           <div className="rounded-2xl border border-border bg-card p-4 space-y-4 shadow-sm">
             <div>
               <h3 className="text-xs font-bold text-foreground uppercase tracking-wider mb-3">Categories</h3>

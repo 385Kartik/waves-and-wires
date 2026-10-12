@@ -57,6 +57,7 @@ export default function AccountPage() {
 
   if (!user) return null;
 
+  const isVerified   = Boolean(user.phone_verified || user.email_verified);
   const bothVerified = user.email_verified && user.phone_verified;
   const hasEmail     = Boolean(user.email && !user.email.endsWith('@ww.internal'));
   const hasPhone     = Boolean(user.phone);
@@ -116,67 +117,43 @@ export default function AccountPage() {
     setPhoneBusy(false);
   }
 
-  async function changePassword() {
-    if (!oldPw || !newPw) { toast.error('Fill all fields'); return; }
-    if (newPw.length < 8)  { toast.error('Min 8 characters'); return; }
-    if (newPw !== newPwCon) { toast.error('Passwords do not match'); return; }
-    setPwBusy(true);
-    try {
-      const res: any = await apiClient.put('/auth/password', { old_password: oldPw, new_password: newPw });
-      if (!res?.success && !res?.data?.success) {
-        toast.error(res?.message || res?.data?.message || 'Failed to update password');
-      } else {
-        toast.success('Password updated!');
-        setChangingPw(false); setOldPw(''); setNewPw(''); setNewPwCon('');
-      }
-    } catch (e: any) {
-      toast.error(e.message || 'Failed to update password');
-    }
-    setPwBusy(false);
-  }
-
-  const inputCls    = "flex-1 rounded-lg border border-input bg-secondary px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring";
-  const pwInputCls  = "w-full rounded-xl border border-border bg-secondary/60 px-4 py-2.5 pr-10 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 transition-all";
-  const otpInputCls = "w-full rounded-lg border border-green-300 bg-white px-3 py-2 text-sm text-center tracking-[0.4em] font-bold focus:outline-none focus:ring-2 focus:ring-green-400";
+  const inputCls    = "min-w-0 flex-1 rounded-lg border border-input bg-secondary px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring";
+  const otpInputCls = "w-full rounded-lg border border-green-300 bg-white px-3 py-2 text-sm text-center tracking-[0.35em] sm:tracking-[0.4em] font-bold focus:outline-none focus:ring-2 focus:ring-green-400";
 
   return (
-    <div className="container py-8 sm:py-10 max-w-3xl">
-      <h1 className="text-2xl font-bold text-foreground mb-6 sm:mb-8">My Account</h1>
+    <div className="container py-6 sm:py-10 max-w-3xl">
+      <h1 className="text-xl sm:text-2xl font-bold text-foreground mb-5 sm:mb-8">My Account</h1>
 
-      {!bothVerified && (
-        <div className={`mb-6 rounded-2xl border px-5 py-4 flex items-start gap-3 ${
-          !hasEmail || !hasPhone ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'
-        }`}>
-          <AlertCircle className={`h-5 w-5 shrink-0 mt-0.5 ${!hasEmail || !hasPhone ? 'text-red-500' : 'text-amber-500'}`} />
+      {!isVerified && (
+        <div className="mb-6 rounded-2xl border bg-amber-50 border-amber-200 px-4 sm:px-5 py-4 flex items-start gap-3">
+          <AlertCircle className="h-5 w-5 shrink-0 mt-0.5 text-amber-500" />
           <div>
-            <p className={`text-sm font-bold ${!hasEmail || !hasPhone ? 'text-red-700' : 'text-amber-700'}`}>
-              {!hasEmail ? 'Add & verify email to place orders'
-               : !hasPhone ? 'Add & verify phone number to place orders'
-               : 'Complete verification to place orders'}
+            <p className="text-sm font-bold text-amber-700">
+              Verify your phone number or email to place orders
             </p>
-            <p className={`text-xs mt-0.5 ${!hasEmail || !hasPhone ? 'text-red-600' : 'text-amber-600'}`}>
-              Both a verified email and phone number are required.
+            <p className="text-xs mt-0.5 text-amber-600">
+              Complete quick OTP verification below.
             </p>
           </div>
         </div>
       )}
 
       <div className="grid gap-5 sm:gap-6 md:grid-cols-2">
-        <div className="rounded-2xl border border-border bg-card p-5 sm:p-6 space-y-5">
+        <div className="rounded-2xl border border-border bg-card p-4 sm:p-6 space-y-5 min-w-0">
 
           {/* Avatar */}
-          <div className="flex items-center gap-4">
-            <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-              <span className="text-xl font-bold text-primary">
+          <div className="flex items-center gap-3.5 sm:gap-4 min-w-0">
+            <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+              <span className="text-lg sm:text-xl font-bold text-primary">
                 {(user.full_name || user.email || user.phone || '?').charAt(0).toUpperCase()}
               </span>
             </div>
-            <div>
-              <p className="font-bold text-foreground">{user.full_name || 'No Name'}</p>
+            <div className="min-w-0">
+              <p className="font-bold text-foreground truncate">{user.full_name || 'Customer'}</p>
               <div className="flex items-center gap-1 mt-0.5">
-                {bothVerified
-                  ? <><CheckCircle2 className="h-3 w-3 text-green-500" /><span className="text-xs text-green-600 font-semibold">Fully Verified</span></>
-                  : <><AlertCircle className="h-3 w-3 text-amber-500" /><span className="text-xs text-amber-600">Verification Pending</span></>
+                {isVerified
+                  ? <><CheckCircle2 className="h-3.5 w-3.5 text-green-500 shrink-0" /><span className="text-xs text-green-600 font-semibold">Verified Account</span></>
+                  : <><AlertCircle className="h-3.5 w-3.5 text-amber-500 shrink-0" /><span className="text-xs text-amber-600">Verification Pending</span></>
                 }
               </div>
             </div>
@@ -189,7 +166,7 @@ export default function AccountPage() {
             {emailStep === 'view' && (
               hasEmail ? (
                 <>
-                  <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-secondary border border-input text-sm">
+                  <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-secondary border border-input text-sm min-w-0">
                     <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
                     <span className="truncate flex-1 text-foreground">{user.email}</span>
                     {user.email_verified
@@ -202,7 +179,7 @@ export default function AccountPage() {
                   </div>
                   {!user.email_verified && (
                     <div className="rounded-xl bg-amber-50 border border-amber-200 px-3 py-3 space-y-2">
-                      <p className="text-xs text-amber-700">Verify your email to place orders.</p>
+                      <p className="text-xs text-amber-700">Verify your email to receive order updates.</p>
                       <button onClick={() => { setEmailStep('edit'); setEmailVal(user.email); }} className="text-xs font-bold text-amber-700 hover:text-amber-900">
                         Send verification OTP →
                       </button>
@@ -211,9 +188,8 @@ export default function AccountPage() {
                 </>
               ) : (
                 <div className="space-y-2">
-                  <div className="rounded-xl bg-red-50 border border-red-200 px-3 py-3">
-                    <p className="text-xs text-red-700 font-semibold">No email added yet</p>
-                    <p className="text-xs text-red-600 mt-0.5">Required for order confirmations.</p>
+                  <div className="rounded-xl bg-secondary/60 border border-border px-3 py-2.5">
+                    <p className="text-xs text-muted-foreground">Add an email address (optional) for email receipts.</p>
                   </div>
                   <button onClick={() => { setEmailStep('edit'); setEmailVal(''); }} className="flex items-center gap-1.5 text-xs font-bold text-primary hover:text-primary/80">
                     <Plus className="h-3.5 w-3.5" /> Add Email Address
@@ -364,16 +340,16 @@ export default function AccountPage() {
             <h2 className="font-semibold text-foreground text-sm">Recent Orders</h2>
             <Link to="/order-tracking?tab=myorders" className="text-xs text-primary font-semibold hover:underline">View all →</Link>
           </div>
-          {!bothVerified && (
+          {!isVerified && (
             <div className="rounded-xl bg-secondary/50 border border-border px-4 py-3 text-xs text-muted-foreground">
-              🔒 Verify both email and phone to place orders.
+              🔒 Verify your phone number or email to place orders.
             </div>
           )}
           {orders.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-8 text-center">
               <Package className="h-8 w-8 text-muted-foreground/30" />
               <p className="text-sm text-muted-foreground">No orders yet</p>
-              {bothVerified && <Link to="/shop" className="text-xs font-semibold text-primary hover:underline">Browse Products</Link>}
+              {isVerified && <Link to="/" className="text-xs font-semibold text-primary hover:underline">Browse Products</Link>}
             </div>
           ) : (
             <div className="space-y-3">

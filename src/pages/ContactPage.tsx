@@ -57,13 +57,13 @@ export default function ContactPage() {
 
         <div className="grid gap-4 sm:gap-6 lg:grid-cols-3">
           {/* Info cards */}
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-1 lg:gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 lg:grid-cols-1 lg:gap-4">
             <a href={`mailto:${settings.store_email}`}
-              className="flex gap-3 rounded-2xl border border-border bg-card p-3 sm:p-4 hover:border-primary/30 hover:bg-primary/5 transition-all group col-span-2 lg:col-span-1">
+              className="flex gap-3 rounded-2xl border border-border bg-card p-3 sm:p-4 hover:border-primary/30 hover:bg-primary/5 transition-all group sm:col-span-2 lg:col-span-1">
               <div className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 group-hover:bg-primary/20 transition-colors">
                 <Mail className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
               </div>
-              <div><p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-0.5">Email</p><p className="text-xs sm:text-sm font-semibold text-foreground break-all">{settings.store_email}</p></div>
+              <div className="min-w-0"><p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-0.5">Email</p><p className="text-xs sm:text-sm font-semibold text-foreground break-all">{settings.store_email}</p></div>
             </a>
 
             {settings.store_phones.map((phone, i) => (
@@ -83,7 +83,7 @@ export default function ContactPage() {
               <div><p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-0.5">Address</p><p className="text-xs sm:text-sm font-semibold text-foreground">Mumbai, India</p></div>
             </div>
 
-            <div className="rounded-2xl border border-border bg-secondary/50 p-3 sm:p-4 col-span-2 lg:col-span-1">
+            <div className="rounded-2xl border border-border bg-secondary/50 p-3 sm:p-4 sm:col-span-2 lg:col-span-1">
               <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">Support Hours</p>
               <div className="space-y-1 text-xs sm:text-sm text-muted-foreground">
                 <div className="flex justify-between"><span>Mon – Sat</span><span className="font-semibold text-foreground">9 AM – 7 PM</span></div>
@@ -92,7 +92,7 @@ export default function ContactPage() {
             </div>
 
             {/* Google Maps */}
-            <div className="rounded-2xl border border-border overflow-hidden">
+            <div className="rounded-2xl border border-border overflow-hidden sm:col-span-2 lg:col-span-1">
               <iframe
                 title="Waves & Wires Location"
                 src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3766.8!2d72.8617!3d19.3015!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2sJesal+Park%2C+Bhayandar+East%2C+Mira+Bhayandar%2C+Maharashtra+401105!5e0!3m2!1sen!2sin!4v1"

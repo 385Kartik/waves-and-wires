@@ -240,12 +240,12 @@ export default function ProductDetailPage() {
           </div>
 
           {/* Price */}
-          <div className="flex items-baseline gap-3 rounded-2xl bg-secondary/50 p-4">
-            <span className="text-3xl font-black text-foreground">
+          <div className="flex flex-wrap items-baseline gap-2.5 sm:gap-3 rounded-2xl bg-secondary/50 p-4">
+            <span className="text-2xl sm:text-3xl font-black text-foreground">
               ₹{(product.price || 0).toLocaleString('en-IN')}
             </span>
             {product.compare_at_price && (
-              <span className="text-lg text-muted-foreground line-through">
+              <span className="text-base sm:text-lg text-muted-foreground line-through">
                 ₹{product.compare_at_price.toLocaleString('en-IN')}
               </span>
             )}
@@ -262,7 +262,7 @@ export default function ProductDetailPage() {
 
           {/* Quantity & Add to Cart */}
           <div className="space-y-3 pt-2">
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Quantity</span>
               <div className="flex items-center rounded-xl border border-border bg-card">
                 <button
@@ -302,7 +302,7 @@ export default function ProductDetailPage() {
           </div>
 
           {/* Trust points */}
-          <div className="grid grid-cols-3 gap-3 border-t border-border pt-4">
+          <div className="grid grid-cols-1 xs:grid-cols-3 gap-2.5 sm:gap-3 border-t border-border pt-4">
             <div className="flex items-center gap-2">
               <Truck className="h-4 w-4 text-primary shrink-0" />
               <span className="text-xs text-muted-foreground font-medium">Free Shipping above ₹999</span>
@@ -320,8 +320,8 @@ export default function ProductDetailPage() {
       </div>
 
       {/* Tabs */}
-      <div className="mt-14">
-        <div className="flex border-b border-border">
+      <div className="mt-10 sm:mt-14">
+        <div className="flex border-b border-border overflow-x-auto no-scrollbar">
           {[
             ['description', 'Description'],
             ['specs', 'Specifications'],
@@ -330,7 +330,7 @@ export default function ProductDetailPage() {
             <button
               key={tab}
               onClick={() => setActiveTab(tab as any)}
-              className={`border-b-2 px-6 py-3 text-sm font-bold transition-all ${
+              className={`border-b-2 px-3.5 sm:px-6 py-3 text-xs sm:text-sm font-bold whitespace-nowrap transition-all ${
                 activeTab === tab
                   ? 'border-primary text-primary'
                   : 'border-transparent text-muted-foreground hover:text-foreground'

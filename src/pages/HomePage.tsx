@@ -46,37 +46,37 @@ export default function HomePage() {
   }, [handleDirectPurchase]);
 
   return (
-    <div className="w-full overflow-x-hidden bg-[#faf6ed] text-[#1c1917] selection:bg-[#facc15] selection:text-black font-sans antialiased pb-16 md:pb-0">
+    <div className="w-full overflow-x-hidden bg-[#faf6ed] text-[#1c1917] selection:bg-[#facc15] selection:text-black font-sans antialiased">
 
       {/* ── 1. HERO SECTION (Mobile-First + Desktop Luxury Layout) ──────────── */}
-      <section id="overview" className="relative w-full min-h-[auto] lg:min-h-[92vh] flex items-center px-4 sm:px-12 lg:px-20 py-8 sm:py-12 lg:py-0 border-b border-amber-900/10 bg-gradient-to-br from-[#fdfcf8] via-[#faf5ea] to-[#f4ecd8]">
+      <section id="overview" className="relative w-full min-h-[auto] lg:min-h-[90vh] flex items-center px-4 sm:px-10 md:px-14 lg:px-20 py-6 sm:py-12 lg:py-10 border-b border-amber-900/10 bg-gradient-to-br from-[#fdfcf8] via-[#faf5ea] to-[#f4ecd8]">
         
         {/* Subtle diagonal warm lighting facets */}
         <div className="absolute inset-0 pointer-events-none opacity-40 bg-[linear-gradient(135deg,rgba(255,255,255,0.8)_0%,transparent_50%,rgba(234,179,8,0.06)_100%)]" />
 
-        <div className="w-full max-w-[1700px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-center relative z-10">
+        <div className="w-full max-w-[1700px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-8 items-center relative z-10">
 
           {/* Left Column: Script Brand + Gigantic M01 + Bright Gold Split Box Button */}
-          <div className="lg:col-span-7 space-y-4 sm:space-y-5 pt-2 lg:pt-0 order-2 lg:order-1">
+          <div className="lg:col-span-7 space-y-4 sm:space-y-5 pt-1 lg:pt-0 order-2 lg:order-1">
             
             {/* Brand Wordmark in Cormorant Garamond Serif Italic Bright Gold Yellow */}
             <div className="space-y-0">
-              <h3 className="font-serif italic text-3xl sm:text-5xl lg:text-6xl text-[#d97706] font-normal tracking-normal leading-tight">
+              <h3 className="font-serif italic text-2xl xs:text-3xl sm:text-5xl lg:text-6xl text-[#d97706] font-normal tracking-normal leading-tight">
                 Waves <span className="font-serif italic text-[#eab308]">Wires</span>
               </h3>
               
               {/* Massive Bold M01 Title */}
-              <h1 className="text-7xl sm:text-9xl md:text-[11rem] lg:text-[13rem] font-black text-[#1c1917] tracking-tighter leading-[0.88] select-none my-1">
+              <h1 className="text-6xl xs:text-7xl sm:text-9xl md:text-[11rem] lg:text-[13rem] font-black text-[#1c1917] tracking-tighter leading-[0.88] select-none my-1">
                 M01
               </h1>
               
               {/* Subtitle with Bright Gold Accent Rules */}
-              <div className="flex items-center gap-2.5 sm:gap-3 pt-1.5 sm:pt-2">
-                <span className="h-[1.5px] w-6 sm:w-8 bg-[#eab308]" />
-                <span className="text-[10px] sm:text-xs font-black uppercase tracking-[0.22em] sm:tracking-[0.28em] text-[#8c6b32]">
+              <div className="flex items-center gap-2 sm:gap-3 pt-1 sm:pt-2">
+                <span className="h-[1.5px] w-5 sm:w-8 bg-[#eab308] shrink-0" />
+                <span className="text-[10px] sm:text-xs font-black uppercase tracking-[0.18em] sm:tracking-[0.28em] text-[#8c6b32]">
                   ELECTRIC COCONUT SCRAPER
                 </span>
-                <span className="h-[1.5px] w-10 sm:w-14 bg-[#eab308] hidden xs:block" />
+                <span className="h-[1.5px] w-8 sm:w-14 bg-[#eab308] hidden xs:block shrink-0" />
               </div>
             </div>
 
@@ -89,40 +89,40 @@ export default function HomePage() {
             <div className="pt-1 sm:pt-2 space-y-3.5">
               
               {/* Quantity Stepper & Pack Presets */}
-              <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
-                <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-[0.2em] text-[#8c6b32] w-full sm:w-auto">
+              <div className="space-y-2 sm:space-y-0 sm:flex sm:flex-wrap sm:items-center sm:gap-3">
+                <span className="block sm:inline text-[10px] sm:text-[11px] font-black uppercase tracking-[0.2em] text-[#8c6b32]">
                   SELECT QUANTITY:
                 </span>
                 
-                {/* Stepper (- / +) */}
-                <div className="inline-flex items-center border-2 border-[#eab308] bg-[#fffdf7] shadow-xs">
-                  <button
-                    type="button"
-                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    className="w-10 h-10 sm:h-11 flex items-center justify-center text-[#1c1917] hover:bg-yellow-400/20 text-base font-black transition-colors active:scale-95"
-                    aria-label="Decrease quantity"
-                  >
-                    −
-                  </button>
-                  <span className="w-9 sm:w-10 text-center font-black text-sm text-[#1c1917] select-none">
-                    {quantity}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setQuantity(quantity + 1)}
-                    className="w-10 h-10 sm:h-11 flex items-center justify-center text-[#1c1917] hover:bg-yellow-400/20 text-base font-black transition-colors active:scale-95"
-                    aria-label="Increase quantity"
-                  >
-                    +
-                  </button>
-                </div>
+                <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 pt-1 sm:pt-0">
+                  {/* Stepper (- / +) */}
+                  <div className="inline-flex items-center border-2 border-[#eab308] bg-[#fffdf7] shadow-xs">
+                    <button
+                      type="button"
+                      onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                      className="w-9 h-10 sm:w-10 sm:h-11 flex items-center justify-center text-[#1c1917] hover:bg-yellow-400/20 text-base font-black transition-colors active:scale-95"
+                      aria-label="Decrease quantity"
+                    >
+                      −
+                    </button>
+                    <span className="w-8 sm:w-10 text-center font-black text-sm text-[#1c1917] select-none">
+                      {quantity}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setQuantity(quantity + 1)}
+                      className="w-9 h-10 sm:w-10 sm:h-11 flex items-center justify-center text-[#1c1917] hover:bg-yellow-400/20 text-base font-black transition-colors active:scale-95"
+                      aria-label="Increase quantity"
+                    >
+                      +
+                    </button>
+                  </div>
 
-                {/* Quick Presets */}
-                <div className="inline-flex items-center gap-2">
+                  {/* Quick Presets */}
                   <button
                     type="button"
                     onClick={() => setQuantity(1)}
-                    className={`px-3 sm:px-3.5 py-2.5 text-[11px] sm:text-xs font-black uppercase tracking-wider transition-all border-2 ${
+                    className={`px-3 sm:px-3.5 h-10 sm:h-11 text-[11px] sm:text-xs font-black uppercase tracking-wider transition-all border-2 ${
                       quantity === 1
                         ? 'border-[#eab308] bg-yellow-400/25 text-[#1c1917] shadow-xs'
                         : 'border-amber-900/15 bg-white/70 text-[#6b5d4d] hover:border-[#eab308]'
@@ -134,13 +134,13 @@ export default function HomePage() {
                   <button
                     type="button"
                     onClick={() => setQuantity(2)}
-                    className={`relative px-3 sm:px-3.5 py-2.5 text-[11px] sm:text-xs font-black uppercase tracking-wider transition-all border-2 ${
+                    className={`relative px-3 sm:px-3.5 h-10 sm:h-11 text-[11px] sm:text-xs font-black uppercase tracking-wider transition-all border-2 ${
                       quantity === 2
                         ? 'border-[#eab308] bg-yellow-400/25 text-[#1c1917] shadow-xs'
                         : 'border-amber-900/15 bg-white/70 text-[#6b5d4d] hover:border-[#eab308]'
                     }`}
                   >
-                    <span className="absolute -top-2.5 right-1 bg-[#d97706] text-white text-[8px] font-black px-1.5 py-0.5 rounded shadow-xs">
+                    <span className="absolute -top-2.5 right-1 bg-[#d97706] text-white text-[8px] font-black px-1.5 py-0.5 rounded shadow-xs leading-none">
                       SAVE ₹200
                     </span>
                     2 Units Combo
@@ -154,13 +154,13 @@ export default function HomePage() {
                 <div className="inline-flex items-stretch border-2 border-[#eab308] bg-[#fffdf7] shadow-sm hover:shadow-lg shadow-yellow-500/10 hover:border-[#1c1917] transition-all w-full sm:w-auto">
                   <button
                     onClick={handleDirectPurchase}
-                    className="relative group flex-1 sm:flex-initial px-6 sm:px-11 py-3.5 sm:py-4 text-xs sm:text-sm font-black uppercase tracking-[0.2em] text-[#1c1917] hover:bg-[#1c1917] hover:text-[#facc15] transition-all active:scale-[0.99] text-center"
+                    className="relative group flex-1 sm:flex-initial px-4 xs:px-6 sm:px-11 py-3.5 sm:py-4 text-xs sm:text-sm font-black uppercase tracking-[0.16em] sm:tracking-[0.2em] text-[#1c1917] hover:bg-[#1c1917] hover:text-[#facc15] transition-all active:scale-[0.99] text-center"
                   >
                     <span>PURCHASE NOW</span>
                     {/* Folded corner triangle decoration */}
                     <span className="absolute bottom-0 right-0 w-3 h-3 bg-[#eab308] [clip-path:polygon(100%_0,0_100%,100%_100%)]" />
                   </button>
-                  <div className="flex items-center justify-center px-5 sm:px-8 py-3.5 sm:py-4 border-l-2 border-[#eab308] text-xs sm:text-sm font-black tracking-wider text-[#d97706] bg-yellow-400/10 shrink-0">
+                  <div className="flex items-center justify-center px-4 xs:px-5 sm:px-8 py-3.5 sm:py-4 border-l-2 border-[#eab308] text-xs sm:text-sm font-black tracking-wider text-[#d97706] bg-yellow-400/10 shrink-0">
                     ₹{totalPrice.toLocaleString('en-IN')}
                   </div>
                 </div>
@@ -174,7 +174,7 @@ export default function HomePage() {
                   }}
                   className="w-full sm:w-auto justify-center px-6 py-3.5 sm:py-4 border-2 border-[#1c1917] bg-transparent hover:bg-[#1c1917] text-[#1c1917] hover:text-[#facc15] text-xs sm:text-sm font-black uppercase tracking-[0.18em] transition-all active:scale-[0.99] flex items-center gap-2 shadow-xs"
                 >
-                  <ShoppingCart className="h-4 w-4" />
+                  <ShoppingCart className="h-4 w-4 shrink-0" />
                   <span>ADD TO CART</span>
                 </button>
               </div>
@@ -190,8 +190,8 @@ export default function HomePage() {
           </div>
 
           {/* Right Column: Hero Transparent Product Cutout with Golden Glow & Studio Shadow */}
-          <div className="lg:col-span-5 flex justify-center items-center relative py-2 sm:py-6 order-1 lg:order-2">
-            <div className="relative w-full max-w-[260px] sm:max-w-lg lg:max-w-xl aspect-square flex items-center justify-center">
+          <div className="lg:col-span-5 flex justify-center items-center relative py-1 sm:py-6 order-1 lg:order-2">
+            <div className="relative w-full max-w-[220px] xs:max-w-[260px] sm:max-w-md lg:max-w-xl aspect-square flex items-center justify-center">
               
               {/* Warm Golden studio backlight */}
               <div className="absolute inset-0 bg-radial from-yellow-300/35 via-amber-200/15 to-transparent rounded-full filter blur-3xl pointer-events-none" />
@@ -235,12 +235,12 @@ export default function HomePage() {
       </section>
 
       {/* ── 3. ASYMMETRIC CRAFTSMANSHIP (Left 3 Specs | Center Machine | Right Story) ── */}
-      <section className="w-full px-4 sm:px-12 lg:px-20 py-12 sm:py-24 bg-[#f6f0e2] border-b border-amber-900/10">
+      <section className="w-full px-4 sm:px-10 md:px-14 lg:px-20 py-12 sm:py-20 lg:py-24 bg-[#f6f0e2] border-b border-amber-900/10">
         <div className="w-full max-w-[1700px] mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-8 items-center">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 sm:gap-10 lg:gap-8 items-center">
 
             {/* Left Column: 3 Circular Specs with Bright Gold Accents & Dotted Dividers */}
-            <div className="lg:col-span-4 space-y-6 sm:space-y-8">
+            <div className="lg:col-span-4 space-y-5 sm:space-y-8">
               
               {/* Spec 1 */}
               <div className="flex items-center gap-4 sm:gap-5">
@@ -297,7 +297,7 @@ export default function HomePage() {
 
             {/* Center Column: Tall Vertical Cutout with Ground Shadow */}
             <div className="lg:col-span-4 flex justify-center items-center">
-              <div className="relative w-full max-w-[260px] sm:max-w-sm aspect-square flex items-center justify-center">
+              <div className="relative w-full max-w-[230px] sm:max-w-sm aspect-square flex items-center justify-center">
                 <img
                   src="/product/scraper-cap-clean.png"
                   alt="Waves & Wires Scraper with Safety Cap"
@@ -325,13 +325,13 @@ export default function HomePage() {
       </section>
 
       {/* ── 4. 3 SQUARE BRIGHT GOLD DETAIL CARDS ──────────────────────────────── */}
-      <section id="details" className="w-full px-4 sm:px-12 lg:px-20 py-12 sm:py-24 bg-[#ede4d2] border-b border-amber-900/10">
+      <section id="details" className="w-full px-4 sm:px-10 md:px-14 lg:px-20 py-12 sm:py-20 lg:py-24 bg-[#ede4d2] border-b border-amber-900/10">
         <div className="w-full max-w-[1700px] mx-auto">
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 sm:gap-6 lg:gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
             
             {/* Card 1: Multi-Toothed Blade Close-Up */}
-            <div className="aspect-square border-2 border-[#eab308] bg-gradient-to-br from-[#fffdfa] to-[#faf3e3] p-6 sm:p-10 flex items-center justify-center overflow-hidden group shadow-md shadow-yellow-500/10 hover:shadow-xl transition-all">
+            <div className="aspect-square border-2 border-[#eab308] bg-gradient-to-br from-[#fffdfa] to-[#faf3e3] p-6 sm:p-8 lg:p-10 flex items-center justify-center overflow-hidden group shadow-md shadow-yellow-500/10 hover:shadow-xl transition-all">
               <img
                 src="/product/scraper-angle-clean.png"
                 alt="Multi-Toothed Rotary Blade"
@@ -340,7 +340,7 @@ export default function HomePage() {
             </div>
 
             {/* Card 2: Machine In Action with Coconut */}
-            <div className="aspect-square border-2 border-[#eab308] bg-gradient-to-br from-[#fffdfa] to-[#faf3e3] p-5 sm:p-8 flex items-center justify-center overflow-hidden group shadow-md shadow-yellow-500/10 hover:shadow-xl transition-all">
+            <div className="aspect-square border-2 border-[#eab308] bg-gradient-to-br from-[#fffdfa] to-[#faf3e3] p-5 sm:p-6 lg:p-8 flex items-center justify-center overflow-hidden group shadow-md shadow-yellow-500/10 hover:shadow-xl transition-all">
               <img
                 src="/product/scraper-action-clean.png"
                 alt="In Action Coconut Shredding"
@@ -349,7 +349,7 @@ export default function HomePage() {
             </div>
 
             {/* Card 3: Machine with Black Protective Dome Cap */}
-            <div className="aspect-square border-2 border-[#eab308] bg-gradient-to-br from-[#fffdfa] to-[#faf3e3] p-6 sm:p-10 flex items-center justify-center overflow-hidden group shadow-md shadow-yellow-500/10 hover:shadow-xl transition-all">
+            <div className="aspect-square border-2 border-[#eab308] bg-gradient-to-br from-[#fffdfa] to-[#faf3e3] p-6 sm:p-8 lg:p-10 flex items-center justify-center overflow-hidden group shadow-md shadow-yellow-500/10 hover:shadow-xl transition-all">
               <img
                 src="/product/scraper-cap-clean.png"
                 alt="Protective Safety Guard"
@@ -363,9 +363,9 @@ export default function HomePage() {
       </section>
 
       {/* ── 5. FEATURES SECTION WITH BRIGHT GOLD LEADER SPECS ────────────────── */}
-      <section id="features" className="w-full px-4 sm:px-12 lg:px-20 py-12 sm:py-24 bg-[#faf5ea] border-b border-amber-900/10">
+      <section id="features" className="w-full px-4 sm:px-10 md:px-14 lg:px-20 py-12 sm:py-20 lg:py-24 bg-[#faf5ea] border-b border-amber-900/10">
         <div className="w-full max-w-[1700px] mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 sm:gap-10 items-center">
 
             {/* Left Column: Heading, Paragraph & Purchase Button */}
             <div className="lg:col-span-4 space-y-4 sm:space-y-5">
@@ -379,7 +379,7 @@ export default function HomePage() {
               <div className="pt-2">
                 <button
                   onClick={handleDirectPurchase}
-                  className="w-full sm:w-auto relative group border-2 border-[#eab308] bg-[#fffdf7] hover:bg-[#1c1917] text-[#1c1917] hover:text-[#facc15] px-8 py-3.5 text-xs font-black uppercase tracking-[0.2em] transition-all shadow-xs hover:shadow-md active:scale-[0.99]"
+                  className="w-full sm:w-auto relative group border-2 border-[#eab308] bg-[#fffdf7] hover:bg-[#1c1917] text-[#1c1917] hover:text-[#facc15] px-6 sm:px-8 py-3.5 text-xs font-black uppercase tracking-[0.16em] sm:tracking-[0.2em] transition-all shadow-xs hover:shadow-md active:scale-[0.99]"
                 >
                   <span>PURCHASE ({quantity} {quantity === 1 ? 'UNIT' : 'UNITS'} • ₹{totalPrice.toLocaleString('en-IN')})</span>
                   {/* Folded corner triangle */}
@@ -390,7 +390,7 @@ export default function HomePage() {
 
             {/* Center Column: Scraper Vertical Image with Warm Ambient Glow */}
             <div className="lg:col-span-4 flex justify-center items-center">
-              <div className="relative w-full max-w-[260px] sm:max-w-sm aspect-square flex items-center justify-center">
+              <div className="relative w-full max-w-[230px] sm:max-w-sm aspect-square flex items-center justify-center">
                 <div className="absolute inset-0 bg-radial from-yellow-300/25 to-transparent rounded-full filter blur-2xl pointer-events-none" />
                 <img
                   src="/product/scraper-action-clean.png"
@@ -401,57 +401,57 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Right Column: Thin Bright Gold Leader Line Technical Callouts */}
-            <div className="lg:col-span-4 space-y-5 sm:space-y-6">
+            {/* Right Column: 2x2 Grid on Mobile/Tablet, Vertical Leader Callouts on Desktop */}
+            <div className="lg:col-span-4 grid grid-cols-2 lg:grid-cols-1 gap-4 sm:gap-6">
               
               {/* Metric 1 */}
-              <div className="space-y-1">
-                <div className="flex items-center gap-3">
-                  <span className="h-[1.5px] flex-1 bg-[#eab308]/40" />
-                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#d97706]">
+              <div className="space-y-1 p-3.5 lg:p-0 rounded-xl lg:rounded-none bg-white/60 lg:bg-transparent border border-amber-900/10 lg:border-0">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <span className="hidden lg:block h-[1.5px] flex-1 bg-[#eab308]/40" />
+                  <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.16em] sm:tracking-[0.2em] text-[#d97706]">
                     MAX POWER INPUT
                   </span>
                 </div>
-                <p className="text-2xl sm:text-3xl font-black text-[#1c1917] text-right tracking-tight">
+                <p className="text-xl sm:text-3xl font-black text-[#1c1917] lg:text-right tracking-tight">
                   150 W
                 </p>
               </div>
 
               {/* Metric 2 */}
-              <div className="space-y-1">
-                <div className="flex items-center gap-3">
-                  <span className="h-[1.5px] flex-1 bg-[#eab308]/40" />
-                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#d97706]">
+              <div className="space-y-1 p-3.5 lg:p-0 rounded-xl lg:rounded-none bg-white/60 lg:bg-transparent border border-amber-900/10 lg:border-0">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <span className="hidden lg:block h-[1.5px] flex-1 bg-[#eab308]/40" />
+                  <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.16em] sm:tracking-[0.2em] text-[#d97706]">
                     ROTATIONAL SPEED
                   </span>
                 </div>
-                <p className="text-2xl sm:text-3xl font-black text-[#1c1917] text-right tracking-tight">
+                <p className="text-xl sm:text-3xl font-black text-[#1c1917] lg:text-right tracking-tight">
                   1000 RPM
                 </p>
               </div>
 
               {/* Metric 3 */}
-              <div className="space-y-1">
-                <div className="flex items-center gap-3">
-                  <span className="h-[1.5px] flex-1 bg-[#eab308]/40" />
-                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#d97706]">
+              <div className="space-y-1 p-3.5 lg:p-0 rounded-xl lg:rounded-none bg-white/60 lg:bg-transparent border border-amber-900/10 lg:border-0">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <span className="hidden lg:block h-[1.5px] flex-1 bg-[#eab308]/40" />
+                  <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.16em] sm:tracking-[0.2em] text-[#d97706]">
                     BLADE STEEL
                   </span>
                 </div>
-                <p className="text-2xl sm:text-3xl font-black text-[#1c1917] text-right tracking-tight">
+                <p className="text-xl sm:text-3xl font-black text-[#1c1917] lg:text-right tracking-tight">
                   SS 304
                 </p>
               </div>
 
               {/* Metric 4 */}
-              <div className="space-y-1">
-                <div className="flex items-center gap-3">
-                  <span className="h-[1.5px] flex-1 bg-[#eab308]/40" />
-                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#d97706]">
+              <div className="space-y-1 p-3.5 lg:p-0 rounded-xl lg:rounded-none bg-white/60 lg:bg-transparent border border-amber-900/10 lg:border-0">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <span className="hidden lg:block h-[1.5px] flex-1 bg-[#eab308]/40" />
+                  <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.16em] sm:tracking-[0.2em] text-[#d97706]">
                     BASE MOUNT
                   </span>
                 </div>
-                <p className="text-2xl sm:text-3xl font-black text-[#1c1917] text-right tracking-tight">
+                <p className="text-lg xs:text-xl sm:text-3xl font-black text-[#1c1917] lg:text-right tracking-tight">
                   VACUUM LEVER
                 </p>
               </div>
@@ -463,9 +463,9 @@ export default function HomePage() {
       </section>
 
       {/* ── MOBILE STICKY BOTTOM ACTION BAR (Mobile-Only Quick Conversion) ───── */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#faf7f0]/95 backdrop-blur-md border-t-2 border-[#eab308] px-4 py-2.5 flex items-center justify-between gap-3 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
-        <div className="flex items-center gap-2">
-          <div className="inline-flex items-center border border-[#eab308] bg-white">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#faf7f0]/95 backdrop-blur-md border-t-2 border-[#eab308] px-3 xs:px-4 pt-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] flex items-center justify-between gap-2 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="inline-flex items-center border border-[#eab308] bg-white shrink-0">
             <button
               type="button"
               onClick={() => setQuantity(Math.max(1, quantity - 1))}
@@ -473,7 +473,7 @@ export default function HomePage() {
             >
               −
             </button>
-            <span className="w-6 text-center font-black text-xs text-[#1c1917]">{quantity}</span>
+            <span className="w-5 text-center font-black text-xs text-[#1c1917]">{quantity}</span>
             <button
               type="button"
               onClick={() => setQuantity(quantity + 1)}
@@ -482,15 +482,15 @@ export default function HomePage() {
               +
             </button>
           </div>
-          <div>
-            <p className="text-sm font-black text-[#1c1917] leading-none">₹{totalPrice.toLocaleString('en-IN')}</p>
-            <p className="text-[9px] font-bold text-[#d97706]">Free COD + 1Yr Warranty</p>
+          <div className="min-w-0">
+            <p className="text-sm font-black text-[#1c1917] leading-none truncate">₹{totalPrice.toLocaleString('en-IN')}</p>
+            <p className="text-[9px] font-bold text-[#d97706] truncate mt-0.5">Free COD + 1Yr Warranty</p>
           </div>
         </div>
 
         <button
           onClick={handleDirectPurchase}
-          className="relative bg-[#1c1917] text-[#facc15] px-5 py-2.5 text-[11px] font-black uppercase tracking-[0.16em] active:scale-95 transition-transform shadow-md"
+          className="relative bg-[#1c1917] text-[#facc15] px-4 xs:px-5 py-2.5 text-[10px] xs:text-[11px] font-black uppercase tracking-[0.14em] active:scale-95 transition-transform shadow-md shrink-0 whitespace-nowrap"
         >
           <span>ORDER NOW</span>
           <span className="absolute bottom-0 right-0 w-2 h-2 bg-[#eab308] [clip-path:polygon(100%_0,0_100%,100%_100%)]" />

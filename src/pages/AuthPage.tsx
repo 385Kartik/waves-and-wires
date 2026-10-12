@@ -147,30 +147,30 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-4 py-12 bg-secondary/30">
+    <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-3 xs:px-4 py-8 sm:py-12 bg-secondary/30">
       <div className="w-full max-w-md">
-        <div className="rounded-2xl border border-border bg-card p-8 shadow-sm">
+        <div className="rounded-2xl border border-border bg-card p-5 sm:p-8 shadow-sm">
 
           {/* Branding */}
-          <div className="mb-7 text-center">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary shadow-sm shadow-primary/30">
+          <div className="mb-6 sm:mb-7 text-center">
+            <div className="mx-auto mb-3.5 sm:mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary shadow-sm shadow-primary/30">
               <span className="text-sm font-black text-primary-foreground">W&W</span>
             </div>
-            <h1 className="text-xl font-black text-foreground">{titles[mode]}</h1>
-            <p className="mt-1.5 text-sm text-muted-foreground">{subs[mode]}</p>
+            <h1 className="text-lg sm:text-xl font-black text-foreground">{titles[mode]}</h1>
+            <p className="mt-1 text-xs sm:text-sm text-muted-foreground">{subs[mode]}</p>
           </div>
 
           {/* Alerts */}
           {error && (
-            <div className="mb-4 flex items-start gap-2.5 rounded-xl bg-red-50 border border-red-200 px-4 py-3">
+            <div className="mb-4 flex items-start gap-2.5 rounded-xl bg-red-50 border border-red-200 px-3.5 py-3">
               <AlertCircle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
-              <p className="text-sm text-red-700">{error}</p>
+              <p className="text-xs sm:text-sm text-red-700">{error}</p>
             </div>
           )}
           {info && (
-            <div className="mb-4 flex items-start gap-2.5 rounded-xl bg-blue-50 border border-blue-200 px-4 py-3">
+            <div className="mb-4 flex items-start gap-2.5 rounded-xl bg-blue-50 border border-blue-200 px-3.5 py-3">
               <ShieldCheck className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
-              <p className="text-sm text-blue-700">{info}</p>
+              <p className="text-xs sm:text-sm text-blue-700">{info}</p>
             </div>
           )}
 
@@ -181,7 +181,7 @@ export default function AuthPage() {
               <div>
                 <label className="label">Mobile Number *</label>
                 <div className="flex gap-2">
-                  <div className="flex items-center gap-1.5 rounded-xl border border-border bg-secondary/60 px-3 text-sm font-semibold text-foreground shrink-0">
+                  <div className="flex items-center gap-1 rounded-xl border border-border bg-secondary/60 px-2.5 sm:px-3 text-xs sm:text-sm font-semibold text-foreground shrink-0">
                     🇮🇳 +91
                   </div>
                   <input
@@ -193,7 +193,7 @@ export default function AuthPage() {
                     value={phone}
                     onChange={e => { setPhone(e.target.value.replace(/\D/g, '')); clr(); }}
                     placeholder="9876543210"
-                    className="flex-1 rounded-xl border border-border bg-secondary/60 py-2.5 px-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                    className="min-w-0 flex-1 rounded-xl border border-border bg-secondary/60 py-2.5 px-3.5 sm:px-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
                   />
                 </div>
                 <p className="mt-1.5 text-[11px] text-muted-foreground">
@@ -223,7 +223,7 @@ export default function AuthPage() {
                 <div>
                   <label className="label">Mobile Number *</label>
                   <div className="flex gap-2">
-                    <div className="flex items-center gap-1.5 rounded-xl border border-border bg-secondary/60 px-3 text-sm font-semibold text-foreground shrink-0">
+                    <div className="flex items-center gap-1 rounded-xl border border-border bg-secondary/60 px-2.5 sm:px-3 text-xs sm:text-sm font-semibold text-foreground shrink-0">
                       🇮🇳 +91
                     </div>
                     <input
@@ -234,7 +234,7 @@ export default function AuthPage() {
                       value={phone}
                       onChange={e => { setPhone(e.target.value.replace(/\D/g, '')); clr(); }}
                       placeholder="9876543210"
-                      className="flex-1 rounded-xl border border-border bg-secondary/60 py-2.5 px-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                      className="min-w-0 flex-1 rounded-xl border border-border bg-secondary/60 py-2.5 px-3.5 sm:px-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
                     />
                   </div>
                   <p className="mt-1.5 text-[11px] text-muted-foreground">
@@ -247,7 +247,7 @@ export default function AuthPage() {
             {/* ── VERIFY PHONE OTP ──────────────────────────────────────── */}
             {mode === 'phone_otp' && (
               <>
-                <div className="rounded-xl bg-green-50 border border-green-200 px-4 py-3 text-xs text-green-700">
+                <div className="rounded-xl bg-green-50 border border-green-200 px-3.5 py-3 text-xs text-green-700">
                   📱 Check SMS on +91 {phone} for your 6-digit OTP
                 </div>
                 <div>
@@ -260,7 +260,7 @@ export default function AuthPage() {
                     value={otp}
                     onChange={e => { setOtp(e.target.value.replace(/\D/g, '')); clr(); }}
                     placeholder="• • • • • •"
-                    className={`${icp} text-center tracking-[0.6em] font-bold text-xl`}
+                    className={`${icp} text-center tracking-[0.35em] sm:tracking-[0.6em] font-bold text-lg sm:text-xl`}
                   />
                 </div>
                 <div className="flex items-center justify-between text-xs pt-1">

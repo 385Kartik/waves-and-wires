@@ -45,11 +45,19 @@
 @layer base {
   * { @apply border-border; }
 
+  html {
+    overflow-x: hidden;
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
   body {
     background-color: hsl(36 25% 96%);
     color: hsl(24 15% 11%);
     font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+    max-width: 100vw;
   }
 
   h1,h2,h3,h4,h5,h6 { @apply font-bold tracking-tight; }
@@ -58,6 +66,8 @@
 @layer utilities {
   .text-balance { text-wrap: balance; }
   .transition-fast { transition: all 150ms ease; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 }
 
 /* Scrollbar */
