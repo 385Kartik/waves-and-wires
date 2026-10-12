@@ -14,8 +14,8 @@ import {
 } from '@/data/scraperReviews';
 
 const SHOWCASE_IMAGES = [
-  { src: '/product/scraper-hero-main.jpg', label: 'Studio Kitchen View' },
   { src: '/product/scraper-angle-clean.png', label: 'Rotary Blade View' },
+  { src: '/product/scraper-hero-main.jpg', label: 'Studio Kitchen View' },
   { src: '/product/scraper-action-clean.png', label: 'In Action Shredding' },
   { src: '/product/scraper-cap-clean.png', label: 'With Safety Guard' },
   { src: '/product/scraper-features.png', label: 'Parts Overview' },
@@ -28,8 +28,8 @@ const M01_PRODUCT = {
   price: 2550,
   compare_at_price: 3499,
   images: [
-    '/product/scraper-hero-main.jpg',
     '/product/scraper-angle-clean.png',
+    '/product/scraper-hero-main.jpg',
     '/product/scraper-action-clean.png',
     '/product/scraper-cap-clean.png',
     '/product/scraper-features.png',
