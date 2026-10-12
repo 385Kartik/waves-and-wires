@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShieldCheck, Zap, Truck, ShoppingCart, Star, CheckCircle2, MessageSquarePlus } from 'lucide-react';
+import { ShieldCheck, Zap, Truck, ShoppingCart, Star, CheckCircle2, MessageSquarePlus, ChevronDown } from 'lucide-react';
 import { useCart } from '@/contexts/CartContext';
 import { apiClient } from '@/api/client';
 import { toast } from 'sonner';
@@ -13,6 +13,13 @@ import {
   ScraperReview,
 } from '@/data/scraperReviews';
 
+const SHOWCASE_IMAGES = [
+  { src: '/product/scraper-angle-clean.png', label: 'Rotary Blade View' },
+  { src: '/product/scraper-action-clean.png', label: 'In Action Shredding' },
+  { src: '/product/scraper-cap-clean.png', label: 'With Safety Guard' },
+  { src: '/product/scraper-features.png', label: 'Parts Overview' },
+];
+
 const M01_PRODUCT = {
   id: 'prod-5',
   name: 'Waves & Wires Electric Coconut Scraper Model M01',
@@ -23,6 +30,7 @@ const M01_PRODUCT = {
     '/product/scraper-angle-clean.png',
     '/product/scraper-action-clean.png',
     '/product/scraper-cap-clean.png',
+    '/product/scraper-features.png',
   ],
   category_id: 'cat-2',
   category_name: 'Kitchen & Appliances',
@@ -46,6 +54,10 @@ export default function HomePage() {
   const navigate = useNavigate();
 
   const [quantity, setQuantity] = useState(1);
+  const [heroImgIdx, setHeroImgIdx] = useState(0);
+  const [featureImgIdx, setFeatureImgIdx] = useState(1);
+  const [openDesignDropdown, setOpenDesignDropdown] = useState<string | null>('overview');
+  const [openFeatureDropdown, setOpenFeatureDropdown] = useState<string | null>('features');
   const [reviews, setReviews] = useState<ScraperReview[]>(OFFICIAL_SCRAPER_REVIEWS);
   const [showAllReviews, setShowAllReviews] = useState(false);
 
@@ -175,8 +187,8 @@ export default function HomePage() {
 
         <div className="w-full max-w-[1700px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-8 items-center relative z-10">
 
-          {/* Left Column: Script Brand + Gigantic M01 + Bright Gold Split Box Button */}
-          <div className="lg:col-span-7 space-y-4 sm:space-y-5 pt-1 lg:pt-0 order-2 lg:order-1">
+          {/* Left Column: Script Brand + Gigantic M01 + Short Summary + Purchase Suite */}
+          <div className="lg:col-span-6 space-y-4 sm:space-y-5 pt-1 lg:pt-0 order-2 lg:order-1">
             
             {/* Brand Wordmark in Cormorant Garamond Serif Italic Bright Gold Yellow */}
             <div className="space-y-0">
@@ -185,7 +197,7 @@ export default function HomePage() {
               </h3>
               
               {/* Massive Bold M01 Title */}
-              <h1 className="text-6xl xs:text-7xl sm:text-9xl md:text-[11rem] lg:text-[13rem] font-black text-[#1c1917] tracking-tighter leading-[0.88] select-none my-1">
+              <h1 className="text-6xl xs:text-7xl sm:text-9xl md:text-[11rem] lg:text-[12.5rem] font-black text-[#1c1917] tracking-tighter leading-[0.88] select-none my-1">
                 M01
               </h1>
               
@@ -195,7 +207,7 @@ export default function HomePage() {
                 <span className="text-[10px] sm:text-xs font-black uppercase tracking-[0.18em] sm:tracking-[0.28em] text-[#8c6b32]">
                   ELECTRIC COCONUT SCRAPER
                 </span>
-                <span className="h-[1.5px] w-8 sm:w-14 bg-[#eab308] hidden xs:block shrink-0" />
+                <span className="h-[1.5px] w-6 sm:w-10 bg-[#eab308] hidden xs:block shrink-0" />
                 <a
                   href="#reviews"
                   className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-yellow-400/20 border border-[#eab308]/50 text-[10px] sm:text-xs font-bold text-[#1c1917] hover:bg-yellow-400/35 transition-colors"
@@ -205,17 +217,14 @@ export default function HomePage() {
                       <Star key={i} className="h-3 w-3 fill-[#eab308] text-[#eab308]" />
                     ))}
                   </span>
-                  <span>Rated 5.0/5 ({reviews.length} Reviews)</span>
+                  <span>5.0/5 ({reviews.length} Reviews)</span>
                 </a>
               </div>
             </div>
 
-            {/* Official Product Description */}
-            <p className="text-xs sm:text-base text-[#4a4237] max-w-xl font-normal leading-relaxed pt-0.5">
-              {OFFICIAL_SCRAPER_DESCRIPTION}
-            </p>
-            <p className="text-xs sm:text-sm font-bold italic text-[#8c6b32]">
-              “{OFFICIAL_SCRAPER_TAGLINE}”
+            {/* Crisp, Short Product Summary */}
+            <p className="text-xs sm:text-base text-[#4a4237] max-w-lg font-normal leading-relaxed pt-0.5">
+              Effortlessly shred fresh coconut into fluffy flakes in seconds — powered by a 150W high-torque motor, sharp SS 304 stainless steel blades, and a rock-solid vacuum lock base.
             </p>
 
             {/* Direct Home Page Quantity Selector & Purchase Suite */}
@@ -322,21 +331,40 @@ export default function HomePage() {
 
           </div>
 
-          {/* Right Column: Hero Transparent Product Cutout with Golden Glow & Studio Shadow */}
-          <div className="lg:col-span-5 flex justify-center items-center relative py-1 sm:py-6 order-1 lg:order-2">
-            <div className="relative w-full max-w-[220px] xs:max-w-[260px] sm:max-w-md lg:max-w-xl aspect-square flex items-center justify-center">
+          {/* Right Column: Large Hero Product Cutout + Interactive Thumbnail Switcher */}
+          <div className="lg:col-span-6 flex flex-col items-center justify-center relative py-1 sm:py-4 order-1 lg:order-2">
+            <div className="relative w-full max-w-[270px] xs:max-w-[320px] sm:max-w-[460px] lg:max-w-[540px] aspect-square flex items-center justify-center">
               
               {/* Warm Golden studio backlight */}
               <div className="absolute inset-0 bg-radial from-yellow-300/35 via-amber-200/15 to-transparent rounded-full filter blur-3xl pointer-events-none" />
               
               <img
-                src="/product/scraper-angle-clean.png"
-                alt="Waves & Wires M01 Electric Coconut Scraper"
-                className="relative z-10 w-full h-full object-contain filter drop-shadow-[0_22px_32px_rgba(0,0,0,0.22)] transform hover:scale-105 hover:-rotate-1 transition-all duration-700 ease-out"
+                src={SHOWCASE_IMAGES[heroImgIdx].src}
+                alt={SHOWCASE_IMAGES[heroImgIdx].label}
+                className="relative z-10 w-full h-full object-contain filter drop-shadow-[0_24px_36px_rgba(0,0,0,0.22)] transform hover:scale-105 transition-all duration-500 ease-out"
               />
 
               {/* Ground contact shadow */}
               <div className="absolute bottom-3 left-1/2 -translate-x-1/2 w-3/4 h-6 sm:h-8 bg-black/15 filter blur-xl rounded-[100%] pointer-events-none" />
+            </div>
+
+            {/* Interactive Image Switcher Thumbnails */}
+            <div className="relative z-20 flex items-center justify-center gap-2.5 sm:gap-3 mt-2">
+              {SHOWCASE_IMAGES.map((img, idx) => (
+                <button
+                  key={img.src}
+                  type="button"
+                  onClick={() => setHeroImgIdx(idx)}
+                  title={img.label}
+                  className={`h-14 w-14 sm:h-16 sm:w-16 p-1.5 bg-[#fffdf8] border-2 transition-all flex items-center justify-center ${
+                    heroImgIdx === idx
+                      ? 'border-[#eab308] scale-105 shadow-md shadow-yellow-500/15'
+                      : 'border-amber-900/15 opacity-70 hover:opacity-100 hover:border-[#eab308]/60'
+                  }`}
+                >
+                  <img src={img.src} alt={img.label} className="h-full w-full object-contain" />
+                </button>
+              ))}
             </div>
           </div>
 
@@ -344,39 +372,48 @@ export default function HomePage() {
 
         {/* Far Right Vertical Indicator (Bright Gold Diamond + Warm Yellow Dots) */}
         <div className="hidden xl:flex flex-col items-center gap-3 absolute right-8 top-1/2 -translate-y-1/2 z-20">
-          <div className="w-2.5 h-2.5 border-2 border-[#eab308] rotate-45 bg-[#facc15]/40" />
-          <div className="w-1.5 h-1.5 rounded-full bg-[#d97706]/40" />
-          <div className="w-1.5 h-1.5 rounded-full bg-[#d97706]/40" />
-          <div className="w-1.5 h-1.5 rounded-full bg-[#d97706]/40" />
+          {SHOWCASE_IMAGES.map((_, idx) => (
+            <button
+              key={idx}
+              type="button"
+              onClick={() => setHeroImgIdx(idx)}
+              aria-label={`View image ${idx + 1}`}
+              className={
+                heroImgIdx === idx
+                  ? 'w-2.5 h-2.5 border-2 border-[#eab308] rotate-45 bg-[#facc15]/60 transition-all'
+                  : 'w-2 h-2 rounded-full bg-[#d97706]/40 hover:bg-[#d97706] transition-all'
+              }
+            />
+          ))}
         </div>
 
       </section>
 
       {/* ── 2. DARK STATEMENT BAND: DESIGN & QUALITY ──────────────────────────── */}
-      <section id="design" className="w-full bg-[#181613] text-white py-12 sm:py-20 px-4 sm:px-10 text-center border-y border-amber-950/40">
-        <div className="max-w-3xl mx-auto space-y-3 sm:space-y-4">
+      <section id="design" className="w-full bg-[#181613] text-white py-10 sm:py-16 px-4 sm:px-10 text-center border-y border-amber-950/40">
+        <div className="max-w-3xl mx-auto space-y-2.5 sm:space-y-3">
           <h2 className="text-xs sm:text-sm font-black uppercase tracking-[0.3em] text-[#facc15]">
             DESIGN & QUALITY
           </h2>
           <p className="text-xs sm:text-base md:text-lg text-[#f5efe6] font-light leading-relaxed max-w-2xl mx-auto">
-            Waves & Wires Model M01 coconut scraper has been developed for modern kitchens, the main focus has been on creating a high-torque pure copper motor with surgical SS 304 food-grade rotary cutters.
+            {OFFICIAL_SCRAPER_TAGLINE}. Engineered with a high-torque pure copper motor and surgical SS 304 food-grade rotary cutters.
           </p>
-          <div className="pt-1 sm:pt-2 text-[#eab308] text-xs select-none">
+          <div className="pt-1 text-[#eab308] text-xs select-none">
             ×
           </div>
         </div>
       </section>
 
-      {/* ── 3. ASYMMETRIC CRAFTSMANSHIP (Left 3 Specs | Center Machine | Right Story) ── */}
+      {/* ── 3. ASYMMETRIC CRAFTSMANSHIP (Left 3 Specs | Large Center Machine | Right Dropdowns) ── */}
       <section className="w-full px-4 sm:px-10 md:px-14 lg:px-20 py-12 sm:py-20 lg:py-24 bg-[#f6f0e2] border-b border-amber-900/10">
         <div className="w-full max-w-[1700px] mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 sm:gap-10 lg:gap-8 items-center">
 
             {/* Left Column: 3 Circular Specs with Bright Gold Accents & Dotted Dividers */}
-            <div className="lg:col-span-4 space-y-5 sm:space-y-8">
+            <div className="lg:col-span-3 space-y-5 sm:space-y-7">
               
               {/* Spec 1 */}
-              <div className="flex items-center gap-4 sm:gap-5">
+              <div className="flex items-center gap-4">
                 <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-full border-2 border-[#eab308] bg-yellow-400/20 flex items-center justify-center shrink-0 text-[#d97706] shadow-sm shadow-yellow-500/10">
                   <div className="h-5 w-5 sm:h-6 sm:w-6 rounded-full border-2 border-[#eab308] flex items-center justify-center">
                     <div className="h-2 w-2 rounded-full bg-[#eab308]" />
@@ -395,7 +432,7 @@ export default function HomePage() {
               <div className="w-full border-t border-dotted border-[#eab308]/30" />
 
               {/* Spec 2 */}
-              <div className="flex items-center gap-4 sm:gap-5">
+              <div className="flex items-center gap-4">
                 <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-full border-2 border-[#eab308] bg-yellow-400/20 flex items-center justify-center shrink-0 text-[#d97706] shadow-sm shadow-yellow-500/10">
                   <ShieldCheck className="h-5 w-5 sm:h-6 sm:w-6 stroke-[2]" />
                 </div>
@@ -404,7 +441,7 @@ export default function HomePage() {
                     1 YEAR
                   </h4>
                   <p className="text-xs text-[#5c5346] font-normal">
-                    Doorstep Brand Replacement Warranty
+                    Invoice Acts as Official Warranty Card
                   </p>
                 </div>
               </div>
@@ -412,7 +449,7 @@ export default function HomePage() {
               <div className="w-full border-t border-dotted border-[#eab308]/30" />
 
               {/* Spec 3 */}
-              <div className="flex items-center gap-4 sm:gap-5">
+              <div className="flex items-center gap-4">
                 <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-full border-2 border-[#eab308] bg-yellow-400/20 flex items-center justify-center shrink-0 text-[#d97706] shadow-sm shadow-yellow-500/10">
                   <Zap className="h-5 w-5 sm:h-6 sm:w-6 stroke-[2]" />
                 </div>
@@ -428,96 +465,223 @@ export default function HomePage() {
 
             </div>
 
-            {/* Center Column: Tall Vertical Cutout with Ground Shadow */}
-            <div className="lg:col-span-4 flex justify-center items-center">
-              <div className="relative w-full max-w-[230px] sm:max-w-sm aspect-square flex items-center justify-center">
+            {/* Center Column: LARGE Center Product Cutout with Ground Shadow */}
+            <div className="lg:col-span-5 flex justify-center items-center py-2">
+              <div className="relative w-full max-w-[300px] xs:max-w-[350px] sm:max-w-[460px] lg:max-w-[540px] aspect-square flex items-center justify-center">
+                <div className="absolute inset-0 bg-radial from-yellow-300/30 via-amber-200/10 to-transparent rounded-full filter blur-3xl pointer-events-none" />
                 <img
                   src="/product/scraper-cap-clean.png"
                   alt="Waves & Wires Scraper with Safety Cap"
-                  className="h-full w-full object-contain filter drop-shadow-[0_22px_32px_rgba(0,0,0,0.18)] transform hover:scale-105 transition-transform duration-500"
+                  className="relative z-10 h-full w-full object-contain filter drop-shadow-[0_25px_36px_rgba(0,0,0,0.2)] transform scale-105 lg:scale-110 hover:scale-115 transition-transform duration-500"
                 />
-                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-2/3 h-6 bg-black/15 filter blur-lg rounded-[100%] pointer-events-none" />
+                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-3/4 h-7 bg-black/15 filter blur-xl rounded-[100%] pointer-events-none" />
               </div>
             </div>
 
-            {/* Right Column: Editorial Craftsmanship Copy */}
-            <div className="lg:col-span-4 space-y-3 sm:space-y-4">
-              <span className="text-[11px] font-black uppercase tracking-[0.25em] text-[#d97706] block">
-                DESIGN & QUALITY
+            {/* Right Column: Clean Interactive Accordion Dropdowns (Instead of Wall of Text) */}
+            <div className="lg:col-span-4 space-y-3">
+              <span className="text-[11px] font-black uppercase tracking-[0.25em] text-[#d97706] block mb-2">
+                DESIGN & CRAFTSMANSHIP
               </span>
-              <p className="text-xs sm:text-sm text-[#4a4237] leading-relaxed font-light">
-                Waves & Wires Model M01 coconut scraper has been developed for effortless daily cooking, the main focus has been on creating a heavy-duty product with modern ergonomics and surgical SS 304 food-grade rotary blades.
-              </p>
-              <p className="text-xs sm:text-sm text-[#4a4237] leading-relaxed font-light">
-                The design is based on countertop stability that preserves the authentic sweetness and fluffy texture of fresh coconut in under 60 seconds. The beautiful details in yellow and charcoal bring to mind classical craftsmanship and modern kitchen efficiency at the same time.
-              </p>
+
+              {[
+                {
+                  id: 'overview',
+                  title: 'Product Description',
+                  body: OFFICIAL_SCRAPER_DESCRIPTION,
+                },
+                {
+                  id: 'ergonomics',
+                  title: 'Surgical SS 304 Rotary Blades',
+                  body: 'Equipped with sharp, detachable food-grade stainless steel blades and a protective dome cap that shred fresh coconut flesh into uniform, fluffy flakes in under 60 seconds.',
+                },
+                {
+                  id: 'stability',
+                  title: 'Heavy-Duty Vacuum Lock Base',
+                  body: 'Features a lever-activated suction base that locks firmly onto kitchen granite, marble, or glass countertops for vibration-free, single-handed operation.',
+                },
+              ].map((item) => {
+                const isOpen = openDesignDropdown === item.id;
+                return (
+                  <div
+                    key={item.id}
+                    className="border-2 border-[#eab308]/60 bg-[#fffdf8] transition-all shadow-xs"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setOpenDesignDropdown(isOpen ? null : item.id)}
+                      className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left font-black text-xs sm:text-sm uppercase tracking-wider text-[#1c1917] hover:bg-yellow-400/10 transition-colors"
+                    >
+                      <span>{item.title}</span>
+                      <ChevronDown
+                        className={`h-4 w-4 text-[#d97706] shrink-0 transition-transform duration-200 ${
+                          isOpen ? 'rotate-180' : ''
+                        }`}
+                      />
+                    </button>
+                    {isOpen && (
+                      <div className="px-4 pb-4 pt-1 text-xs sm:text-sm text-[#4a4237] leading-relaxed border-t border-amber-900/10">
+                        {item.body}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
           </div>
         </div>
       </section>
 
-      {/* ── 4. 3 SQUARE BRIGHT GOLD DETAIL CARDS ──────────────────────────────── */}
+      {/* ── 4. 4 VISUAL SHOWCASE GALLERY CARDS ────────────────────────────────── */}
       <section id="details" className="w-full px-4 sm:px-10 md:px-14 lg:px-20 py-12 sm:py-20 lg:py-24 bg-[#ede4d2] border-b border-amber-900/10">
-        <div className="w-full max-w-[1700px] mx-auto">
-          
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
-            
-            {/* Card 1: Multi-Toothed Blade Close-Up */}
-            <div className="aspect-square border-2 border-[#eab308] bg-gradient-to-br from-[#fffdfa] to-[#faf3e3] p-6 sm:p-8 lg:p-10 flex items-center justify-center overflow-hidden group shadow-md shadow-yellow-500/10 hover:shadow-xl transition-all">
-              <img
-                src="/product/scraper-angle-clean.png"
-                alt="Multi-Toothed Rotary Blade"
-                className="h-full w-full object-contain filter drop-shadow-[0_15px_20px_rgba(0,0,0,0.15)] group-hover:scale-110 transition-transform duration-500 ease-out"
-              />
+        <div className="w-full max-w-[1700px] mx-auto space-y-6 sm:space-y-8">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2">
+            <div>
+              <span className="text-[11px] font-black uppercase tracking-[0.25em] text-[#d97706] block">
+                360° VISUAL GALLERY
+              </span>
+              <h2 className="text-2xl sm:text-4xl font-black text-[#1c1917] tracking-tight uppercase mt-1">
+                BUILT FOR EVERY INDIAN KITCHEN
+              </h2>
             </div>
-
-            {/* Card 2: Machine In Action with Coconut */}
-            <div className="aspect-square border-2 border-[#eab308] bg-gradient-to-br from-[#fffdfa] to-[#faf3e3] p-5 sm:p-6 lg:p-8 flex items-center justify-center overflow-hidden group shadow-md shadow-yellow-500/10 hover:shadow-xl transition-all">
-              <img
-                src="/product/scraper-action-clean.png"
-                alt="In Action Coconut Shredding"
-                className="h-full w-full object-contain filter drop-shadow-[0_15px_20px_rgba(0,0,0,0.15)] group-hover:scale-110 transition-transform duration-500 ease-out"
-              />
-            </div>
-
-            {/* Card 3: Machine with Black Protective Dome Cap */}
-            <div className="aspect-square border-2 border-[#eab308] bg-gradient-to-br from-[#fffdfa] to-[#faf3e3] p-6 sm:p-8 lg:p-10 flex items-center justify-center overflow-hidden group shadow-md shadow-yellow-500/10 hover:shadow-xl transition-all">
-              <img
-                src="/product/scraper-cap-clean.png"
-                alt="Protective Safety Guard"
-                className="h-full w-full object-contain filter drop-shadow-[0_15px_20px_rgba(0,0,0,0.15)] group-hover:scale-110 transition-transform duration-500 ease-out"
-              />
-            </div>
-
+            <p className="text-xs sm:text-sm font-semibold text-[#6b5d4d]">
+              Click any angle in the showcase to inspect closer
+            </p>
           </div>
 
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+            {SHOWCASE_IMAGES.map((card, idx) => (
+              <div
+                key={card.src}
+                onClick={() => setFeatureImgIdx(idx)}
+                className="cursor-pointer border-2 border-[#eab308] bg-gradient-to-br from-[#fffdfa] to-[#faf3e3] p-5 sm:p-6 flex flex-col justify-between overflow-hidden group shadow-md shadow-yellow-500/10 hover:shadow-xl transition-all"
+              >
+                <div className="aspect-square w-full flex items-center justify-center p-2">
+                  <img
+                    src={card.src}
+                    alt={card.label}
+                    className="h-full w-full object-contain filter drop-shadow-[0_15px_20px_rgba(0,0,0,0.15)] group-hover:scale-110 transition-transform duration-500 ease-out"
+                  />
+                </div>
+                <div className="pt-3 border-t border-amber-900/10 flex items-center justify-between">
+                  <span className="text-[11px] font-black uppercase tracking-[0.16em] text-[#1c1917]">
+                    {card.label}
+                  </span>
+                  <span className="text-xs font-black text-[#d97706]">0{idx + 1}</span>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
-      {/* ── 5. FEATURES & PRODUCT SPECIFICATIONS SECTION ─────────────────────── */}
+      {/* ── 5. FEATURES & SPECIFICATIONS (Dropdowns | Large Center Image | Leader Metrics) ── */}
       <section id="features" className="w-full px-4 sm:px-10 md:px-14 lg:px-20 py-12 sm:py-20 lg:py-24 bg-[#faf5ea] border-b border-amber-900/10">
-        <div className="w-full max-w-[1700px] mx-auto space-y-12 sm:space-y-16">
+        <div className="w-full max-w-[1700px] mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 sm:gap-10 items-center">
 
-            {/* Left Column: Heading, Official Features List & Purchase Button */}
-            <div className="lg:col-span-5 space-y-4 sm:space-y-5">
-              <h2 className="text-3xl sm:text-5xl font-black text-[#1c1917] tracking-tight uppercase">
-                FEATURES
-              </h2>
-              <p className="text-xs sm:text-sm text-[#4a4237] leading-relaxed font-normal">
-                {OFFICIAL_SCRAPER_DESCRIPTION}
-              </p>
+            {/* Left Column: Heading, Interactive Dropdowns & Purchase Button */}
+            <div className="lg:col-span-4 space-y-4">
+              <div className="space-y-1">
+                <span className="text-[11px] font-black uppercase tracking-[0.25em] text-[#d97706] block">
+                  ENGINEERED PERFORMANCE
+                </span>
+                <h2 className="text-3xl sm:text-5xl font-black text-[#1c1917] tracking-tight uppercase">
+                  FEATURES
+                </h2>
+              </div>
 
-              {/* Official 7 Features Bullet List */}
-              <ul className="space-y-2.5 pt-1">
-                {OFFICIAL_SCRAPER_FEATURES.map((feat, i) => (
-                  <li key={i} className="flex items-start gap-2.5 text-xs sm:text-sm text-[#1c1917] font-medium">
-                    <CheckCircle2 className="h-4 w-4 text-[#d97706] shrink-0 mt-0.5" />
-                    <span>{feat}</span>
-                  </li>
-                ))}
-              </ul>
+              {/* 3 Interactive Dropdowns for Features, Specifications & Warranty */}
+              <div className="space-y-2.5 pt-1">
+                {/* Dropdown 1: Key Features (7 Official Points) */}
+                <div className="border-2 border-[#eab308]/70 bg-[#fffdf8] shadow-xs">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setOpenFeatureDropdown(openFeatureDropdown === 'features' ? null : 'features')
+                    }
+                    className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left font-black text-xs sm:text-sm uppercase tracking-wider text-[#1c1917] hover:bg-yellow-400/10 transition-colors"
+                  >
+                    <span>Key Features (7 Highlights)</span>
+                    <ChevronDown
+                      className={`h-4 w-4 text-[#d97706] shrink-0 transition-transform duration-200 ${
+                        openFeatureDropdown === 'features' ? 'rotate-180' : ''
+                      }`}
+                    />
+                  </button>
+                  {openFeatureDropdown === 'features' && (
+                    <ul className="px-4 pb-4 pt-2 space-y-2 border-t border-amber-900/10">
+                      {OFFICIAL_SCRAPER_FEATURES.map((feat, i) => (
+                        <li key={i} className="flex items-start gap-2 text-xs sm:text-sm text-[#1c1917] font-medium">
+                          <CheckCircle2 className="h-4 w-4 text-[#d97706] shrink-0 mt-0.5" />
+                          <span>{feat}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+
+                {/* Dropdown 2: Product Specifications */}
+                <div className="border-2 border-[#eab308]/70 bg-[#fffdf8] shadow-xs">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setOpenFeatureDropdown(openFeatureDropdown === 'specs' ? null : 'specs')
+                    }
+                    className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left font-black text-xs sm:text-sm uppercase tracking-wider text-[#1c1917] hover:bg-yellow-400/10 transition-colors"
+                  >
+                    <span>Product Specifications</span>
+                    <ChevronDown
+                      className={`h-4 w-4 text-[#d97706] shrink-0 transition-transform duration-200 ${
+                        openFeatureDropdown === 'specs' ? 'rotate-180' : ''
+                      }`}
+                    />
+                  </button>
+                  {openFeatureDropdown === 'specs' && (
+                    <div className="divide-y divide-amber-900/10 border-t border-amber-900/10">
+                      {Object.entries(OFFICIAL_SCRAPER_SPECIFICATIONS).map(([label, value]) => (
+                        <div key={label} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                          <span className="text-[11px] font-black uppercase tracking-wider text-[#8c6b32]">
+                            {label}
+                          </span>
+                          <span className="text-xs sm:text-sm font-bold text-[#1c1917] text-right">
+                            {value}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Dropdown 3: Warranty & Care */}
+                <div className="border-2 border-[#eab308]/70 bg-[#fffdf8] shadow-xs">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setOpenFeatureDropdown(openFeatureDropdown === 'warranty' ? null : 'warranty')
+                    }
+                    className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left font-black text-xs sm:text-sm uppercase tracking-wider text-[#1c1917] hover:bg-yellow-400/10 transition-colors"
+                  >
+                    <span>1-Year Warranty & Easy Cleaning</span>
+                    <ChevronDown
+                      className={`h-4 w-4 text-[#d97706] shrink-0 transition-transform duration-200 ${
+                        openFeatureDropdown === 'warranty' ? 'rotate-180' : ''
+                      }`}
+                    />
+                  </button>
+                  {openFeatureDropdown === 'warranty' && (
+                    <div className="px-4 pb-4 pt-2 text-xs sm:text-sm text-[#4a4237] leading-relaxed border-t border-amber-900/10 space-y-1.5">
+                      <p className="font-bold text-[#1c1917]">
+                        ✓ 1 Year Brand Warranty (Please consider your Invoice as the official warranty card).
+                      </p>
+                      <p>
+                        ✓ Detachable stainless steel cutter & collection tray rinse clean under running water in seconds.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
 
               <div className="pt-2">
                 <button
@@ -531,44 +695,92 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Center Column: Scraper Vertical Image with Warm Ambient Glow */}
-            <div className="lg:col-span-3 flex justify-center items-center">
-              <div className="relative w-full max-w-[230px] sm:max-w-sm aspect-square flex items-center justify-center">
-                <div className="absolute inset-0 bg-radial from-yellow-300/25 to-transparent rounded-full filter blur-2xl pointer-events-none" />
+            {/* Center Column: LARGE Interactive Product Image Showcase */}
+            <div className="lg:col-span-5 flex flex-col items-center justify-center py-2">
+              <div className="relative w-full max-w-[300px] xs:max-w-[350px] sm:max-w-[460px] lg:max-w-[540px] aspect-square flex items-center justify-center">
+                <div className="absolute inset-0 bg-radial from-yellow-300/30 to-transparent rounded-full filter blur-3xl pointer-events-none" />
                 <img
-                  src="/product/scraper-action-clean.png"
-                  alt="Scraper Features View"
-                  className="h-full w-full object-contain filter drop-shadow-[0_22px_32px_rgba(0,0,0,0.2)] transform hover:scale-105 transition-transform duration-500"
+                  src={SHOWCASE_IMAGES[featureImgIdx].src}
+                  alt={SHOWCASE_IMAGES[featureImgIdx].label}
+                  className="relative z-10 h-full w-full object-contain filter drop-shadow-[0_25px_36px_rgba(0,0,0,0.22)] transform scale-105 lg:scale-110 hover:scale-115 transition-transform duration-500"
                 />
-                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-2/3 h-6 bg-black/15 filter blur-lg rounded-[100%] pointer-events-none" />
+                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-3/4 h-7 bg-black/15 filter blur-xl rounded-[100%] pointer-events-none" />
+              </div>
+
+              {/* View Selector Pills under Center Feature Image */}
+              <div className="flex flex-wrap items-center justify-center gap-2 mt-3">
+                {SHOWCASE_IMAGES.map((img, idx) => (
+                  <button
+                    key={img.src}
+                    type="button"
+                    onClick={() => setFeatureImgIdx(idx)}
+                    className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-wider border transition-all ${
+                      featureImgIdx === idx
+                        ? 'border-[#eab308] bg-[#1c1917] text-[#facc15] shadow-xs'
+                        : 'border-amber-900/20 bg-white/80 text-[#5c5346] hover:border-[#eab308]'
+                    }`}
+                  >
+                    {img.label}
+                  </button>
+                ))}
               </div>
             </div>
 
-            {/* Right Column: Official Product Specifications Table / Callouts */}
-            <div className="lg:col-span-4 space-y-4">
-              <div className="flex items-center gap-2.5">
-                <span className="h-[2px] w-6 bg-[#eab308]" />
-                <h3 className="text-sm sm:text-base font-black uppercase tracking-[0.2em] text-[#1c1917]">
-                  PRODUCT SPECIFICATIONS
-                </h3>
+            {/* Right Column: 4 Bold Visual Leader Metrics */}
+            <div className="lg:col-span-3 grid grid-cols-2 lg:grid-cols-1 gap-4 sm:gap-6">
+              
+              {/* Metric 1 */}
+              <div className="space-y-1 p-3.5 lg:p-0 rounded-xl lg:rounded-none bg-white/60 lg:bg-transparent border border-amber-900/10 lg:border-0">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <span className="hidden lg:block h-[1.5px] flex-1 bg-[#eab308]/40" />
+                  <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.16em] sm:tracking-[0.2em] text-[#d97706]">
+                    MAX POWER INPUT
+                  </span>
+                </div>
+                <p className="text-xl sm:text-3xl font-black text-[#1c1917] lg:text-right tracking-tight">
+                  150 W
+                </p>
               </div>
 
-              <div className="border-2 border-[#eab308]/60 bg-[#fffdf8] divide-y divide-amber-900/10 shadow-sm">
-                {Object.entries(OFFICIAL_SCRAPER_SPECIFICATIONS).map(([label, value]) => (
-                  <div key={label} className="flex items-center justify-between gap-4 px-4 py-3 sm:px-5 sm:py-3.5">
-                    <span className="text-[11px] sm:text-xs font-black uppercase tracking-[0.15em] text-[#8c6b32]">
-                      {label}
-                    </span>
-                    <span className="text-xs sm:text-sm font-bold text-[#1c1917] text-right">
-                      {value}
-                    </span>
-                  </div>
-                ))}
+              {/* Metric 2 */}
+              <div className="space-y-1 p-3.5 lg:p-0 rounded-xl lg:rounded-none bg-white/60 lg:bg-transparent border border-amber-900/10 lg:border-0">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <span className="hidden lg:block h-[1.5px] flex-1 bg-[#eab308]/40" />
+                  <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.16em] sm:tracking-[0.2em] text-[#d97706]">
+                    ROTATIONAL SPEED
+                  </span>
+                </div>
+                <p className="text-xl sm:text-3xl font-black text-[#1c1917] lg:text-right tracking-tight">
+                  1000 RPM
+                </p>
               </div>
 
-              <p className="text-xs sm:text-sm font-semibold text-[#8c6b32] italic pt-1">
-                {OFFICIAL_SCRAPER_TAGLINE}
-              </p>
+              {/* Metric 3 */}
+              <div className="space-y-1 p-3.5 lg:p-0 rounded-xl lg:rounded-none bg-white/60 lg:bg-transparent border border-amber-900/10 lg:border-0">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <span className="hidden lg:block h-[1.5px] flex-1 bg-[#eab308]/40" />
+                  <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.16em] sm:tracking-[0.2em] text-[#d97706]">
+                    OPERATING VOLTAGE
+                  </span>
+                </div>
+                <p className="text-xl sm:text-3xl font-black text-[#1c1917] lg:text-right tracking-tight">
+                  240 V
+                </p>
+              </div>
+
+              {/* Metric 4 */}
+              <div className="space-y-1 p-3.5 lg:p-0 rounded-xl lg:rounded-none bg-white/60 lg:bg-transparent border border-amber-900/10 lg:border-0">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <span className="hidden lg:block h-[1.5px] flex-1 bg-[#eab308]/40" />
+                  <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.16em] sm:tracking-[0.2em] text-[#d97706]">
+                    NET WEIGHT
+                  </span>
+                </div>
+                <p className="text-lg xs:text-xl sm:text-3xl font-black text-[#1c1917] lg:text-right tracking-tight">
+                  1.5 KG
+                </p>
+              </div>
+
             </div>
 
           </div>
