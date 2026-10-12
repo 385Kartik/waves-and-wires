@@ -158,9 +158,11 @@ export const products: Product[] = [
     price: 2550,
     compare_at_price: 3499,
     images: [
+      '/product/scraper-hero-main.jpg',
       '/product/scraper-angle-clean.png',
       '/product/scraper-action-clean.png',
       '/product/scraper-cap-clean.png',
+      '/product/scraper-features.png',
     ],
     category_id: 'cat-2',
     category_name: 'Kitchen & Appliances',

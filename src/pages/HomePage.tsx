@@ -14,6 +14,7 @@ import {
 } from '@/data/scraperReviews';
 
 const SHOWCASE_IMAGES = [
+  { src: '/product/scraper-hero-main.jpg', label: 'Studio Kitchen View' },
   { src: '/product/scraper-angle-clean.png', label: 'Rotary Blade View' },
   { src: '/product/scraper-action-clean.png', label: 'In Action Shredding' },
   { src: '/product/scraper-cap-clean.png', label: 'With Safety Guard' },
@@ -27,6 +28,7 @@ const M01_PRODUCT = {
   price: 2550,
   compare_at_price: 3499,
   images: [
+    '/product/scraper-hero-main.jpg',
     '/product/scraper-angle-clean.png',
     '/product/scraper-action-clean.png',
     '/product/scraper-cap-clean.png',
@@ -331,38 +333,48 @@ export default function HomePage() {
 
           </div>
 
-          {/* Right Column: Large Hero Product Cutout + Interactive Thumbnail Switcher */}
+          {/* Right Column: Large Hero Product Showcase + Interactive Thumbnail Switcher */}
           <div className="lg:col-span-6 flex flex-col items-center justify-center relative py-1 sm:py-4 order-1 lg:order-2">
-            <div className="relative w-full max-w-[270px] xs:max-w-[320px] sm:max-w-[460px] lg:max-w-[540px] aspect-square flex items-center justify-center">
+            <div className="relative w-full max-w-[290px] xs:max-w-[340px] sm:max-w-[460px] lg:max-w-[520px] aspect-square flex items-center justify-center">
               
               {/* Warm Golden studio backlight */}
-              <div className="absolute inset-0 bg-radial from-yellow-300/35 via-amber-200/15 to-transparent rounded-full filter blur-3xl pointer-events-none" />
+              <div className="absolute -inset-4 bg-radial from-yellow-300/35 via-amber-200/15 to-transparent rounded-full filter blur-3xl pointer-events-none" />
               
               <img
                 src={SHOWCASE_IMAGES[heroImgIdx].src}
                 alt={SHOWCASE_IMAGES[heroImgIdx].label}
-                className="relative z-10 w-full h-full object-contain filter drop-shadow-[0_24px_36px_rgba(0,0,0,0.22)] transform hover:scale-105 transition-all duration-500 ease-out"
+                className={`relative z-10 w-full h-full transition-all duration-500 ease-out ${
+                  heroImgIdx === 0
+                    ? 'object-cover border-2 border-[#eab308] shadow-[0_24px_48px_rgba(0,0,0,0.22)] hover:scale-[1.02]'
+                    : 'object-contain filter drop-shadow-[0_24px_36px_rgba(0,0,0,0.22)] hover:scale-105'
+                }`}
               />
 
-              {/* Ground contact shadow */}
-              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 w-3/4 h-6 sm:h-8 bg-black/15 filter blur-xl rounded-[100%] pointer-events-none" />
+              {/* Ground contact shadow for transparent cutouts */}
+              {heroImgIdx !== 0 && (
+                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 w-3/4 h-6 sm:h-8 bg-black/15 filter blur-xl rounded-[100%] pointer-events-none" />
+              )}
             </div>
 
             {/* Interactive Image Switcher Thumbnails */}
-            <div className="relative z-20 flex items-center justify-center gap-2.5 sm:gap-3 mt-2">
+            <div className="relative z-20 flex flex-wrap items-center justify-center gap-2 sm:gap-2.5 mt-3">
               {SHOWCASE_IMAGES.map((img, idx) => (
                 <button
                   key={img.src}
                   type="button"
                   onClick={() => setHeroImgIdx(idx)}
                   title={img.label}
-                  className={`h-14 w-14 sm:h-16 sm:w-16 p-1.5 bg-[#fffdf8] border-2 transition-all flex items-center justify-center ${
+                  className={`h-12 w-12 xs:h-14 xs:w-14 sm:h-16 sm:w-16 p-1 bg-[#fffdf8] border-2 transition-all flex items-center justify-center overflow-hidden ${
                     heroImgIdx === idx
                       ? 'border-[#eab308] scale-105 shadow-md shadow-yellow-500/15'
                       : 'border-amber-900/15 opacity-70 hover:opacity-100 hover:border-[#eab308]/60'
                   }`}
                 >
-                  <img src={img.src} alt={img.label} className="h-full w-full object-contain" />
+                  <img
+                    src={img.src}
+                    alt={img.label}
+                    className={`h-full w-full ${idx === 0 ? 'object-cover' : 'object-contain'}`}
+                  />
                 </button>
               ))}
             </div>
@@ -550,18 +562,20 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-5">
             {SHOWCASE_IMAGES.map((card, idx) => (
               <div
                 key={card.src}
                 onClick={() => setFeatureImgIdx(idx)}
-                className="cursor-pointer border-2 border-[#eab308] bg-gradient-to-br from-[#fffdfa] to-[#faf3e3] p-5 sm:p-6 flex flex-col justify-between overflow-hidden group shadow-md shadow-yellow-500/10 hover:shadow-xl transition-all"
+                className="cursor-pointer border-2 border-[#eab308] bg-gradient-to-br from-[#fffdfa] to-[#faf3e3] p-4 sm:p-5 flex flex-col justify-between overflow-hidden group shadow-md shadow-yellow-500/10 hover:shadow-xl transition-all"
               >
-                <div className="aspect-square w-full flex items-center justify-center p-2">
+                <div className="aspect-square w-full flex items-center justify-center p-1.5 overflow-hidden">
                   <img
                     src={card.src}
                     alt={card.label}
-                    className="h-full w-full object-contain filter drop-shadow-[0_15px_20px_rgba(0,0,0,0.15)] group-hover:scale-110 transition-transform duration-500 ease-out"
+                    className={`h-full w-full ${
+                      card.src.endsWith('.jpg') ? 'object-cover rounded-xs' : 'object-contain'
+                    } filter drop-shadow-[0_15px_20px_rgba(0,0,0,0.15)] group-hover:scale-110 transition-transform duration-500 ease-out`}
                   />
                 </div>
                 <div className="pt-3 border-t border-amber-900/10 flex items-center justify-between">
