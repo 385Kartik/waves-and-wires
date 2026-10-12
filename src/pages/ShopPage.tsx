@@ -1,25 +1,31 @@
 import { useState, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useParams } from 'react-router-dom';
 import { SlidersHorizontal } from 'lucide-react';
 import ProductCard from '@/components/ProductCard';
 import { useProducts, useCategories } from '@/hooks/useProducts';
 
 export default function ShopPage() {
+  const { categorySlug } = useParams<{ categorySlug?: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const searchQuery = searchParams.get('search') || '';
-  const categoryFilter = searchParams.get('category') || '';
+  const rawCategory = categorySlug || searchParams.get('category') || '';
+  const categoryFilter = rawCategory === 'coconut-scraper' ? 'kitchen-appliances' : rawCategory;
   const [sortBy, setSortBy] = useState('newest');
   const [priceMax, setPriceMax] = useState(50000);
   const [showFilters, setShowFilters] = useState(false);
 
   const { products: raw, loading } = useProducts({
-    categorySlug: categoryFilter || undefined,
+    categorySlug: categoryFilter && categoryFilter !== 'uncategorized' ? categoryFilter : undefined,
     search: searchQuery || undefined,
   });
   const { categories } = useCategories();
 
   const products = useMemo(() => {
     let result = [...raw].filter(p => (p.price || 0) <= priceMax);
+    if (rawCategory === 'coconut-scraper') {
+      const scrapers = result.filter(p => p.slug.includes('coconut') || p.name.toLowerCase().includes('coconut'));
+      if (scrapers.length > 0) result = scrapers;
+    }
     switch (sortBy) {
       case 'price-asc':
         result.sort((a, b) => (a.price || 0) - (b.price || 0));
@@ -35,7 +41,7 @@ export default function ShopPage() {
         break;
     }
     return result;
-  }, [raw, sortBy, priceMax]);
+  }, [raw, sortBy, priceMax, rawCategory]);
 
   function setCategory(slug: string) {
     const p = new URLSearchParams(searchParams);
@@ -44,12 +50,23 @@ export default function ShopPage() {
     setSearchParams(p);
   }
 
+  const pageTitle =
+    rawCategory === 'coconut-scraper'
+      ? 'Coconut Scraper'
+      : rawCategory === 'uncategorized'
+      ? 'Uncategorized'
+      : categoryFilter
+      ? categories.find(c => c.slug === categoryFilter)?.name ?? 'Products'
+      : searchQuery
+      ? `"${searchQuery}"`
+      : 'Shop';
+
   return (
-    <div className="container py-8 max-w-7xl">
+    <div className="w-full max-w-[1400px] mx-auto px-4 sm:px-10 lg:px-14 py-8 sm:py-12">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3 sm:gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-foreground">
-            {categoryFilter ? categories.find(c => c.slug === categoryFilter)?.name ?? 'Products' : searchQuery ? `"${searchQuery}"` : 'All Products'}
+            {pageTitle}
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">{loading ? '…' : `${products.length} products`}</p>
         </div>

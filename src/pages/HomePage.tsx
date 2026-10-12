@@ -16,8 +16,8 @@ import {
 const SHOWCASE_IMAGES = [
   { src: '/product/scraper-angle-clean.png', label: 'Rotary Blade View' },
   { src: '/product/scraper-hero-main.jpg', label: 'Studio Kitchen View' },
-  { src: '/product/scraper-action-clean.png', label: 'In Action Shredding' },
-  { src: '/product/scraper-cap-clean.png', label: 'With Safety Guard' },
+  { src: '/product/scraper-action-main.jpg', label: 'In Action Shredding' },
+  { src: '/product/scraper-cap-main.jpg', label: 'With Safety Guard' },
   { src: '/product/scraper-features.png', label: 'Parts Overview' },
 ];
 
@@ -30,8 +30,8 @@ const M01_PRODUCT = {
   images: [
     '/product/scraper-angle-clean.png',
     '/product/scraper-hero-main.jpg',
-    '/product/scraper-action-clean.png',
-    '/product/scraper-cap-clean.png',
+    '/product/scraper-action-main.jpg',
+    '/product/scraper-cap-main.jpg',
     '/product/scraper-features.png',
   ],
   category_id: 'cat-2',
@@ -195,16 +195,16 @@ export default function HomePage() {
             {/* Brand Wordmark in Cormorant Garamond Serif Italic Bright Gold Yellow */}
             <div className="space-y-0">
               <h3 className="font-serif italic text-2xl xs:text-3xl sm:text-5xl lg:text-6xl text-[#d97706] font-normal tracking-normal leading-tight">
-                Waves <span className="font-serif italic text-[#eab308]">Wires</span>
+                Waves <span className='font-serif italic text-black'>&</span><span className="font-serif italic text-[#eab308]"> Wires</span>
               </h3>
               
               {/* Massive Bold M01 Title */}
-              <h1 className="text-6xl xs:text-7xl sm:text-9xl md:text-[11rem] lg:text-[12.5rem] font-black text-[#1c1917] tracking-tighter leading-[0.88] select-none my-1">
-                M01
+              <h1 className="text-4xl xs:text-5xl sm:text-5xl md:text-[7rem] lg:text-[8rem] font-black text-[#1c1917] tracking-tighter leading-[0.88] select-none pb-6">
+                Coconut Scrapper
               </h1>
               
               {/* Subtitle with Bright Gold Accent Rules */}
-              <div className="flex flex-wrap items-center gap-2 sm:gap-3 pt-1 sm:pt-2">
+              <div className="flex mt-2 flex-wrap items-center gap-2 sm:gap-3 pt-1 sm:pt-2">
                 <span className="h-[1.5px] w-5 sm:w-8 bg-[#eab308] shrink-0" />
                 <span className="text-[10px] sm:text-xs font-black uppercase tracking-[0.18em] sm:tracking-[0.28em] text-[#8c6b32]">
                   ELECTRIC COCONUT SCRAPER
@@ -219,7 +219,7 @@ export default function HomePage() {
                       <Star key={i} className="h-3 w-3 fill-[#eab308] text-[#eab308]" />
                     ))}
                   </span>
-                  <span>5.0/5 ({reviews.length} Reviews)</span>
+                  <span>5.0/5  ({reviews.length} Reviews)</span>
                 </a>
               </div>
             </div>
@@ -344,14 +344,14 @@ export default function HomePage() {
                 src={SHOWCASE_IMAGES[heroImgIdx].src}
                 alt={SHOWCASE_IMAGES[heroImgIdx].label}
                 className={`relative z-10 w-full h-full transition-all duration-500 ease-out ${
-                  heroImgIdx === 0
+                  SHOWCASE_IMAGES[heroImgIdx].src.endsWith('.jpg')
                     ? 'object-cover border-2 border-[#eab308] shadow-[0_24px_48px_rgba(0,0,0,0.22)] hover:scale-[1.02]'
                     : 'object-contain filter drop-shadow-[0_24px_36px_rgba(0,0,0,0.22)] hover:scale-105'
                 }`}
               />
 
               {/* Ground contact shadow for transparent cutouts */}
-              {heroImgIdx !== 0 && (
+              {!SHOWCASE_IMAGES[heroImgIdx].src.endsWith('.jpg') && (
                 <div className="absolute bottom-3 left-1/2 -translate-x-1/2 w-3/4 h-6 sm:h-8 bg-black/15 filter blur-xl rounded-[100%] pointer-events-none" />
               )}
             </div>
@@ -373,7 +373,7 @@ export default function HomePage() {
                   <img
                     src={img.src}
                     alt={img.label}
-                    className={`h-full w-full ${idx === 0 ? 'object-cover' : 'object-contain'}`}
+                    className={`h-full w-full ${img.src.endsWith('.jpg') ? 'object-cover' : 'object-contain'}`}
                   />
                 </button>
               ))}
@@ -482,11 +482,10 @@ export default function HomePage() {
               <div className="relative w-full max-w-[300px] xs:max-w-[350px] sm:max-w-[460px] lg:max-w-[540px] aspect-square flex items-center justify-center">
                 <div className="absolute inset-0 bg-radial from-yellow-300/30 via-amber-200/10 to-transparent rounded-full filter blur-3xl pointer-events-none" />
                 <img
-                  src="/product/scraper-cap-clean.png"
+                  src="/product/scraper-cap-main.jpg"
                   alt="Waves & Wires Scraper with Safety Cap"
-                  className="relative z-10 h-full w-full object-contain filter drop-shadow-[0_25px_36px_rgba(0,0,0,0.2)] transform scale-105 lg:scale-110 hover:scale-115 transition-transform duration-500"
+                  className="relative z-10 h-full w-full object-cover border-2 border-[#eab308] shadow-[0_24px_48px_rgba(0,0,0,0.22)] hover:scale-[1.02] transition-transform duration-500"
                 />
-                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-3/4 h-7 bg-black/15 filter blur-xl rounded-[100%] pointer-events-none" />
               </div>
             </div>
 
@@ -557,9 +556,9 @@ export default function HomePage() {
                 BUILT FOR EVERY INDIAN KITCHEN
               </h2>
             </div>
-            <p className="text-xs sm:text-sm font-semibold text-[#6b5d4d]">
+            {/* <p className="text-xs sm:text-sm font-semibold text-[#6b5d4d]">
               Click any angle in the showcase to inspect closer
-            </p>
+            </p> */}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-5">
@@ -716,9 +715,15 @@ export default function HomePage() {
                 <img
                   src={SHOWCASE_IMAGES[featureImgIdx].src}
                   alt={SHOWCASE_IMAGES[featureImgIdx].label}
-                  className="relative z-10 h-full w-full object-contain filter drop-shadow-[0_25px_36px_rgba(0,0,0,0.22)] transform scale-105 lg:scale-110 hover:scale-115 transition-transform duration-500"
+                  className={`relative z-10 h-full w-full transition-transform duration-500 ${
+                    SHOWCASE_IMAGES[featureImgIdx].src.endsWith('.jpg')
+                      ? 'object-cover border-2 border-[#eab308] shadow-[0_24px_48px_rgba(0,0,0,0.22)] hover:scale-[1.02]'
+                      : 'object-contain filter drop-shadow-[0_25px_36px_rgba(0,0,0,0.22)] transform scale-105 lg:scale-110 hover:scale-115'
+                  }`}
                 />
-                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-3/4 h-7 bg-black/15 filter blur-xl rounded-[100%] pointer-events-none" />
+                {!SHOWCASE_IMAGES[featureImgIdx].src.endsWith('.jpg') && (
+                  <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-3/4 h-7 bg-black/15 filter blur-xl rounded-[100%] pointer-events-none" />
+                )}
               </div>
 
               {/* View Selector Pills under Center Feature Image */}

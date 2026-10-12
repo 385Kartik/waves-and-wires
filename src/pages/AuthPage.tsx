@@ -153,9 +153,11 @@ export default function AuthPage() {
 
           {/* Branding */}
           <div className="mb-6 sm:mb-7 text-center">
-            <div className="mx-auto mb-3.5 sm:mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary shadow-sm shadow-primary/30">
-              <span className="text-sm font-black text-primary-foreground">W&W</span>
-            </div>
+            <img
+              src="/logo.png"
+              alt="Waves and Wires Technologies LLP"
+              className="mx-auto mb-3.5 sm:mb-4 h-14 sm:h-16 w-auto object-contain"
+            />
             <h1 className="text-lg sm:text-xl font-black text-foreground">{titles[mode]}</h1>
             <p className="mt-1 text-xs sm:text-sm text-muted-foreground">{subs[mode]}</p>
           </div>

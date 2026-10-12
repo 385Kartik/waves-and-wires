@@ -52,7 +52,7 @@ export default function CareersPage() {
       </section>
 
       {/* Perks */}
-      <section className="container py-12 max-w-4xl">
+      <section className="w-full max-w-[1400px] mx-auto px-4 sm:px-10 lg:px-14 py-12">
         <h2 className="text-xl sm:text-2xl font-bold text-foreground text-center mb-8">Why Work With Us?</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {perks.map(({ icon: Icon, title, desc }) => (
@@ -69,7 +69,7 @@ export default function CareersPage() {
 
       {/* Openings */}
       <section className="bg-secondary/30 border-y border-border">
-        <div className="container py-12 max-w-4xl">
+        <div className="w-full max-w-[1400px] mx-auto px-4 sm:px-10 lg:px-14 py-12">
           <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-2">Open Positions</h2>
           <p className="text-sm text-muted-foreground mb-8">{openings.length} positions available</p>
           <div className="space-y-5">

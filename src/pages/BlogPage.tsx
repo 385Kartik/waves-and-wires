@@ -61,7 +61,7 @@ export default function BlogPage() {
   const [featured, ...rest] = posts;
 
   return (
-    <div className="container py-8 sm:py-12 max-w-5xl">
+    <div className="w-full max-w-[1400px] mx-auto px-4 sm:px-10 lg:px-14 py-10 sm:py-14">
       <div className="mb-8 sm:mb-10">
         <div className="flex items-center gap-3 mb-2">
           <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center">

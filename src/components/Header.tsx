@@ -24,11 +24,13 @@ export default function Header() {
     <header className="sticky top-0 z-50 bg-[#faf7f0]/95 backdrop-blur-md border-b border-amber-900/10 transition-all shadow-xs">
       <div className="w-full max-w-[1700px] mx-auto px-3 xs:px-4 sm:px-10 lg:px-14 h-14 sm:h-20 flex items-center justify-between gap-2">
         
-        {/* Brand Logo / Wordmark in Serif Italic Bright Gold Yellow */}
-        <Link to="/" className="flex items-center gap-1 group shrink-0">
-          <span className="font-serif italic text-lg xs:text-xl sm:text-3xl text-[#1a1714] font-normal tracking-tight group-hover:text-[#d97706] transition-colors">
-            Waves <span className="font-serif italic text-[#d97706] group-hover:text-[#eab308]">Wires</span>
-          </span>
+        {/* Official Company Logo */}
+        <Link to="/" className="flex items-center gap-2 group shrink-0">
+          <img
+            src="/logo.png"
+            alt="Waves and Wires Technologies LLP"
+            className="h-10 xs:h-11 sm:h-14 w-auto object-contain transition-transform duration-200 group-hover:scale-105"
+          />
         </Link>
 
         {/* Minimal Nav Anchor Links (Desktop) */}
@@ -37,7 +39,9 @@ export default function Header() {
           <a href="/#design" className="hover:text-[#d97706] transition-colors">Design & Quality</a>
           <a href="/#details" className="hover:text-[#d97706] transition-colors">Details</a>
           <a href="/#features" className="hover:text-[#d97706] transition-colors">Features</a>
-          <a href="/#reviews" className="hover:text-[#d97706] transition-colors">Reviews (30)</a>
+          <a href="/#reviews" className="hover:text-[#d97706] transition-colors">Reviews</a>
+          <a href="/contact-us" className="hover:text-[#d97706] transition-colors">Contact Us</a>
+          
         </nav>
 
         {/* Right Actions: Purchase Button, Account, Cart & Mobile Menu Toggle */}
@@ -125,7 +129,14 @@ export default function Header() {
               onClick={() => setMobileMenuOpen(false)}
               className="col-span-2 px-3 py-2.5 rounded-lg bg-yellow-400/20 border border-[#eab308]/50 hover:border-[#eab308] text-[#1a1714] text-center"
             >
-              ★ Customer Reviews (30)
+              ★ Customer Reviews
+            </a>
+            <a
+              href="/contact-us"
+              onClick={() => setMobileMenuOpen(false)}
+              className="col-span-2 px-3 py-2.5 rounded-lg bg-yellow-400/20 border border-[#eab308]/50 hover:border-[#eab308] text-[#1a1714] text-center"
+            >
+              Contact Us
             </a>
             <Link
               to={user ? '/account' : '/auth'}

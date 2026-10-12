@@ -26,7 +26,8 @@ interface Review {
 
 export default function ProductDetailPage() {
   const { slug } = useParams<{ slug: string }>();
-  const { product, loading } = useProduct(slug ?? '');
+  const normalizedSlug = slug === 'electric-coconut-scraper' ? 'electric-coconut-scraper-pro' : (slug ?? '');
+  const { product, loading } = useProduct(normalizedSlug);
   const { products: related } = useProducts({ limit: 8 });
   const { addItem } = useCart();
   const { isInWishlist, toggleItem } = useWishlist();

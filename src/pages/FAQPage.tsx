@@ -60,7 +60,7 @@ function FAQItem({ q, a }: { q: string; a: string }) {
 
 export default function FAQPage() {
   return (
-    <div className="container py-12 max-w-3xl">
+    <div className="w-full max-w-[1400px] mx-auto px-4 sm:px-10 lg:px-14 py-10 sm:py-14">
       <div className="flex items-center gap-3 mb-8">
         <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
           <HelpCircle className="h-5 w-5 text-primary" />

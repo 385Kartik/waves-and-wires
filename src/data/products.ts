@@ -160,8 +160,8 @@ export const products: Product[] = [
     images: [
       '/product/scraper-angle-clean.png',
       '/product/scraper-hero-main.jpg',
-      '/product/scraper-action-clean.png',
-      '/product/scraper-cap-clean.png',
+      '/product/scraper-action-main.jpg',
+      '/product/scraper-cap-main.jpg',
       '/product/scraper-features.png',
     ],
     category_id: 'cat-2',
