@@ -323,10 +323,10 @@ export default function HomePage() {
                 </button>
               </div>
 
-              {/* Free Delivery & COD Highlight */}
+              {/* Delivery & COD Highlight */}
               <p className="text-[11px] font-bold text-[#8c6b32] flex items-center gap-2 pt-0.5">
                 <Truck className="h-3.5 w-3.5 text-[#d97706] shrink-0" />
-                <span>Free 2-Day Express Delivery • Cash on Delivery (COD) Available</span>
+                <span>Express Delivery (₹199) • Cash on Delivery (COD) Available</span>
               </p>
 
             </div>
@@ -1062,7 +1062,7 @@ export default function HomePage() {
           </div>
           <div className="min-w-0">
             <p className="text-sm font-black text-[#1c1917] leading-none truncate">₹{totalPrice.toLocaleString('en-IN')}</p>
-            <p className="text-[9px] font-bold text-[#d97706] truncate mt-0.5">Free COD + 1Yr Warranty</p>
+            <p className="text-[9px] font-bold text-[#d97706] truncate mt-0.5">₹199 Shipping • COD Available</p>
           </div>
         </div>
 

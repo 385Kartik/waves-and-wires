@@ -353,7 +353,7 @@ export default function ProductDetailPage() {
           <div className="grid grid-cols-1 xs:grid-cols-3 gap-2.5 sm:gap-3 border-t border-border pt-4">
             <div className="flex items-center gap-2">
               <Truck className="h-4 w-4 text-primary shrink-0" />
-              <span className="text-xs text-muted-foreground font-medium">Free Shipping above ₹999</span>
+              <span className="text-xs text-muted-foreground font-medium">Express Shipping (₹199)</span>
             </div>
             <div className="flex items-center gap-2">
               <Shield className="h-4 w-4 text-primary shrink-0" />

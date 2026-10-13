@@ -10,8 +10,8 @@ export default function WhatsAppButton() {
   const whatsappUrl = `https://wa.me/${phoneNumber}?text=${defaultMessage}`;
 
   return (
-    <div className="fixed bottom-5 right-5 sm:bottom-6 sm:right-6 z-50 flex items-center group">
-      {/* Subtle Tooltip on Hover */}
+    <div className="fixed bottom-20 xs:bottom-[82px] sm:bottom-6 right-3.5 sm:right-6 z-40 flex items-center group">
+      {/* Subtle Tooltip on Hover (Desktop) */}
       <div className="hidden sm:flex items-center mr-3 px-3.5 py-1.5 rounded-full bg-[#1c1917] text-white text-xs font-semibold shadow-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap border border-white/10">
         <span>Chat on WhatsApp</span>
         <span className="text-emerald-400 font-bold ml-1.5">• Online</span>
@@ -23,14 +23,14 @@ export default function WhatsAppButton() {
         target="_blank"
         rel="noopener noreferrer"
         aria-label="Chat with Waves and Wires on WhatsApp (+91 60095 95600)"
-        className="relative flex items-center justify-center w-14 h-14 sm:w-15 sm:h-15 rounded-full bg-[#25D366] text-white shadow-lg hover:shadow-2xl hover:scale-105 active:scale-95 transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-[#25D366]/40"
+        className="relative flex items-center justify-center w-12 h-12 xs:w-13 xs:h-13 sm:w-14 sm:h-14 rounded-full bg-[#25D366] text-white shadow-lg hover:shadow-2xl hover:scale-105 active:scale-95 transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-[#25D366]/40"
       >
         {/* Subtle breathing glow ring */}
         <span className="absolute -inset-1 rounded-full bg-[#25D366] opacity-30 animate-ping pointer-events-none" />
 
         {/* WhatsApp Official SVG Icon */}
         <svg
-          className="w-8 h-8 fill-current relative z-10 drop-shadow-sm"
+          className="w-6.5 h-6.5 xs:w-7 xs:h-7 sm:w-8 sm:h-8 fill-current relative z-10 drop-shadow-sm"
           viewBox="0 0 24 24"
           xmlns="http://www.w3.org/2000/svg"
         >

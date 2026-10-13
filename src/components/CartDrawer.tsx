@@ -1,12 +1,10 @@
-import { X, ShoppingBag, Plus, Minus, Trash2, ArrowRight, Sparkles, AlertCircle } from 'lucide-react';
+import { X, ShoppingBag, Plus, Minus, Trash2, ArrowRight, Sparkles, AlertCircle, Truck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useCart } from '@/contexts/CartContext';
 
 export default function CartDrawer() {
   const { items, isOpen, setIsOpen, removeItem, updateQuantity, itemCount, subtotal } = useCart();
-  const shipping     = subtotal >= 999 ? 0 : 99;
-  const freeShipLeft = 999 - subtotal;
-  const freeShipPct  = Math.min((subtotal / 999) * 100, 100);
+  const shipping     = subtotal > 0 ? 199 : 0;
 
   if (!isOpen) return null;
 
@@ -44,29 +42,14 @@ export default function CartDrawer() {
           </button>
         </div>
 
-        {/* ── Free shipping bar ─────────────────────── */}
+        {/* ── Shipping info banner ─────────────────── */}
         {itemCount > 0 && (
-          <div className="px-4 sm:px-5 py-3.5 bg-white border-b border-stone-100">
-            {shipping === 0 ? (
-              <div className="flex items-center gap-2">
-                <div className="h-5 w-5 rounded-full bg-green-100 flex items-center justify-center shrink-0">
-                  <Sparkles className="h-3 w-3 text-green-600" />
-                </div>
-                <p className="text-xs font-bold text-green-700">Free shipping unlocked! 🎉</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <p className="text-xs text-stone-500">
-                  Add <span className="font-black text-amber-500">₹{freeShipLeft.toLocaleString('en-IN')}</span> more for free shipping
-                </p>
-                <div className="relative h-1.5 w-full rounded-full bg-stone-100 overflow-hidden">
-                  <div
-                    className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-amber-400 to-amber-500 transition-all duration-700"
-                    style={{ width: `${freeShipPct}%` }}
-                  />
-                </div>
-              </div>
-            )}
+          <div className="px-4 sm:px-5 py-3 bg-white border-b border-stone-100 flex items-center justify-between text-xs text-stone-600">
+            <span className="flex items-center gap-1.5 font-medium">
+              <Truck className="h-3.5 w-3.5 text-amber-500" />
+              Standard Express Delivery
+            </span>
+            <span className="font-bold text-stone-900">₹{shipping}</span>
           </div>
         )}
 
@@ -179,10 +162,7 @@ export default function CartDrawer() {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-stone-500">Shipping</span>
-                {shipping === 0
-                  ? <span className="font-bold text-green-600">Free</span>
-                  : <span className="font-bold text-stone-900">₹{shipping}</span>
-                }
+                <span className="font-bold text-stone-900">₹{shipping}</span>
               </div>
               <div className="flex justify-between items-center pt-2 border-t border-stone-100">
                 <span className="font-black text-stone-900">Total</span>

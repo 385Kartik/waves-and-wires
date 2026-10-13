@@ -64,7 +64,7 @@ export default function CheckoutPage() {
     }
   }, [user]);
 
-  const shipping = subtotal >= 999 ? 0 : 0;
+  const shipping = subtotal > 0 ? 199 : 0;
   const discount = couponApplied?.discount ?? 0;
   const taxBase  = subtotal - discount;
   const tax      = Math.round(taxBase * 0.18);

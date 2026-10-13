@@ -4,7 +4,7 @@ import { useCart } from '@/contexts/CartContext';
 
 export default function CartPage() {
   const { items, removeItem, updateQuantity, itemCount, subtotal } = useCart();
-  const shipping = subtotal >= 999 || subtotal === 0 ? 0 : 99;
+  const shipping = subtotal > 0 ? 199 : 0;
   const total = subtotal + shipping;
 
   return (
@@ -122,8 +122,8 @@ export default function CartPage() {
               </div>
               <div className="flex justify-between text-muted-foreground">
                 <span>Shipping</span>
-                <span className="font-semibold text-green-600">
-                  {shipping === 0 ? 'Free Shipping' : `₹${shipping}`}
+                <span className="font-semibold text-foreground">
+                  ₹{shipping}
                 </span>
               </div>
               <div className="border-t border-border pt-3 flex justify-between text-base font-black text-foreground">
