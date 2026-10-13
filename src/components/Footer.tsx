@@ -120,6 +120,19 @@ export default function Footer() {
                     Contact Us
                   </Link>
                 </li>
+                <li className="pt-1 text-[11px] sm:text-xs text-[#64748b]">
+                  <span className="font-semibold text-[#1c1917]">GSTIN:</span> 27AACFW7273M1ZI
+                </li>
+                <li className="text-[11px] sm:text-xs text-[#64748b]">
+                  <a
+                    href="https://wa.me/916009595600"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-[#15803d] transition-colors inline-flex items-center gap-1 text-[#16a34a] font-medium"
+                  >
+                    <span>WhatsApp: +91 60095 95600</span>
+                  </a>
+                </li>
               </ul>
             </div>
           </div>
@@ -151,9 +164,13 @@ export default function Footer() {
 
           {/* Horizontal Divider */}
           <div className="border-t border-gray-200 pt-6 sm:pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <p className="text-xs sm:text-[13px] text-[#64748b] font-medium text-center sm:text-left">
-              Copyright @ 2025. Waves and Wires Technologies LLP
-            </p>
+            <div className="flex flex-col sm:flex-row items-center gap-1.5 sm:gap-3 text-xs sm:text-[13px] text-[#64748b] font-medium text-center sm:text-left">
+              <p>Copyright @ 2025. Waves and Wires Technologies LLP</p>
+              <span className="hidden sm:inline text-gray-300">•</span>
+              <p className="text-[11px] sm:text-xs">
+                GSTIN: <span className="font-bold text-[#1c1917]">27AACFW7273M1ZI</span>
+              </p>
+            </div>
 
             {/* Payment Method Logos */}
             <div className="flex flex-wrap items-center justify-center sm:justify-end gap-2">

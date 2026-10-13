@@ -50,6 +50,8 @@ export default function PaymentCallback() {
       if (!data.success && data.state === 'FAILED') {
         setErrMsg(data.error ?? 'Your payment could not be processed.');
         setStatus('failed');
+        // Auto redirect to Home page after 4 seconds if payment failed
+        setTimeout(() => navigate('/'), 4000);
         return;
       }
 
@@ -143,18 +145,37 @@ export default function PaymentCallback() {
       <p className="text-sm text-muted-foreground max-w-sm">
         {errMsg || 'Your payment could not be processed. You have not been charged.'}
       </p>
-      <div className="flex gap-3 mt-2">
-        <button onClick={() => navigate(-1)}
-          className="rounded-xl border border-border px-5 py-2.5 text-sm font-semibold text-foreground hover:bg-secondary transition-all">
-          ← Go Back
-        </button>
-        <Link to="/shop"
-          className="rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground hover:bg-primary/90 transition-all">
-          Continue Shopping
+      <p className="text-xs font-medium text-amber-800 bg-amber-50 border border-amber-200/80 rounded-lg px-3.5 py-1.5">
+        Redirecting you to the Home page in a few seconds…
+      </p>
+      <div className="flex flex-wrap items-center justify-center gap-3 mt-2">
+        <Link
+          to="/"
+          className="rounded-xl bg-primary px-6 py-2.5 text-sm font-bold text-primary-foreground hover:bg-primary/90 transition-all shadow-sm"
+        >
+          Return to Home Page
+        </Link>
+        <Link
+          to="/checkout"
+          className="rounded-xl border border-border px-5 py-2.5 text-sm font-semibold text-foreground hover:bg-secondary transition-all"
+        >
+          Try Checkout Again
         </Link>
       </div>
-      <p className="text-xs text-muted-foreground mt-2">
-        Need help? <a href="mailto:support@wavesandwires.in" className="text-primary hover:underline">support@wavesandwires.in</a>
+      <p className="text-xs text-muted-foreground mt-3">
+        Need help? Contact us on WhatsApp at{' '}
+        <a
+          href="https://wa.me/916009595600"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-bold text-emerald-600 hover:underline"
+        >
+          +91 60095 95600
+        </a>{' '}
+        or{' '}
+        <a href="mailto:support@wavesandwires.in" className="text-primary hover:underline">
+          support@wavesandwires.in
+        </a>
       </p>
     </div>
   );

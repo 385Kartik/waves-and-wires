@@ -145,7 +145,7 @@ export default function ContactPage() {
                       GST Registration
                     </p>
                     <span className="inline-block mt-1 px-2.5 py-0.5 border border-[#eab308]/60 bg-yellow-400/20 text-[#92400e] text-[11px] font-black tracking-wider">
-                      27BQXPS4248A1ZE
+                      27AACFW7273M1ZI
                     </span>
                   </div>
                 </div>

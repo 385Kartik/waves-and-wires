@@ -242,10 +242,12 @@ export default function CheckoutPage() {
       } else {
         // Payment initiation failed — cancel the order we just created
         await apiClient.put(`/orders/${orderNum}`, { status: 'cancelled', payment_status: 'failed' });
-        toast.error(data.error || 'PhonePe initiation failed. Please try again.');
+        toast.error(data.error || 'Payment initiation failed. Redirecting to home...');
+        setTimeout(() => navigate('/'), 2000);
       }
     } catch (err: any) {
-      toast.error(err.message ?? 'Payment initiation failed');
+      toast.error(err.message ?? 'Payment initiation failed. Redirecting to home...');
+      setTimeout(() => navigate('/'), 2000);
     } finally {
       setPlacing(false);
     }
@@ -367,6 +369,11 @@ export default function CheckoutPage() {
             className="w-full rounded-full bg-[#ffd814] hover:bg-[#f7ca00] py-3.5 text-sm font-bold text-zinc-900 border border-[#fcd200] shadow-sm hover:shadow transition-all disabled:opacity-50 flex items-center justify-center gap-2">
             {placing ? '…' : payMethod === 'cod' ? '✓ Place Order (COD)' : '🔒 Pay ₹' + total.toLocaleString('en-IN') + ' via PhonePe'}
           </button>
+
+          <div className="flex flex-col items-center gap-1 text-[11px] text-muted-foreground pt-1 text-center">
+            <p>100% Safe &amp; Secure Checkout • Waves and Wires Technologies LLP</p>
+            <p>GSTIN: <span className="font-semibold text-foreground">27AACFW7273M1ZI</span></p>
+          </div>
         </div>
       </div>
     );
