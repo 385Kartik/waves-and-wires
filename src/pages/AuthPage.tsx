@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Mail, User, ArrowRight, CheckCircle2,
   AlertCircle, ShieldCheck, Phone,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { apiClient } from '@/api/client';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Mode =
@@ -26,6 +27,8 @@ export default function AuthPage() {
   } = useAuth();
 
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirectUrl = searchParams.get('redirect') || '/';
 
   // Default is Phone Number for Sign In (and Sign Up defaults to Phone too)
   const [mode,     setMode]     = useState<Mode>('signin_phone');
@@ -42,8 +45,8 @@ export default function AuthPage() {
 
   // Auto navigate once logged in
   useEffect(() => {
-    if (!isLoading && user) navigate('/');
-  }, [user, isLoading]); // eslint-disable-line
+    if (!isLoading && user) navigate(redirectUrl);
+  }, [user, isLoading, redirectUrl]); // eslint-disable-line
 
   // ── Phone OTP Flow (Sign In & Sign Up) ────────────────────────────────────
   async function handleSendPhoneOtp(isSignup: boolean) {
@@ -76,7 +79,20 @@ export default function AuthPage() {
     setBusy(true);
     const ok = await verifySmsOtp(phone, otp.trim(), undefined, fullName.trim() || undefined);
     setBusy(false);
-    if (ok) navigate('/');
+    if (ok) {
+      if (fullName.trim()) {
+        apiClient.post('/leads', {
+          name: fullName.trim(),
+          phone: phone,
+          source: 'signup',
+          quantity: 1,
+          product_name: 'Electric Coconut Scraper',
+          status: 'new_lead',
+          notes: 'Customer signed up via Phone OTP',
+        }).catch(() => {});
+      }
+      navigate(redirectUrl);
+    }
   }
 
   // ── Email OTP Flow (Sign In & Sign Up) ────────────────────────────────────
@@ -109,7 +125,21 @@ export default function AuthPage() {
     setBusy(true);
     const ok = await verifyEmailOtp(otp.trim(), email.trim(), fullName.trim() || undefined);
     setBusy(false);
-    if (ok) navigate('/');
+    if (ok) {
+      if (fullName.trim()) {
+        apiClient.post('/leads', {
+          name: fullName.trim(),
+          email: email.trim(),
+          phone: '',
+          source: 'signup',
+          quantity: 1,
+          product_name: 'Electric Coconut Scraper',
+          status: 'new_lead',
+          notes: 'Customer signed up via Email OTP',
+        }).catch(() => {});
+      }
+      navigate(redirectUrl);
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {

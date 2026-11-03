@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ShieldCheck, Zap, Truck, ShoppingCart, Star, CheckCircle2, MessageSquarePlus, ChevronDown } from 'lucide-react';
 import { useCart } from '@/contexts/CartContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { apiClient } from '@/api/client';
 import { toast } from 'sonner';
 import {
@@ -53,6 +54,7 @@ const RATING_LABELS: Record<number, string> = {
 
 export default function HomePage() {
   const { addItem, setIsOpen } = useCart();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   const [quantity, setQuantity] = useState(1);
@@ -76,10 +78,15 @@ export default function HomePage() {
   const totalPrice = quantity === 2 ? unitPrice * 2 - 200 : unitPrice * quantity;
 
   const handleDirectPurchase = useCallback(() => {
+    if (!user) {
+      toast.info('Please sign in or create an account to purchase.');
+      navigate('/auth?redirect=/checkout');
+      return;
+    }
     setIsOpen(false);
     addItem(M01_PRODUCT, quantity, false);
     navigate('/checkout');
-  }, [addItem, navigate, quantity, setIsOpen]);
+  }, [addItem, navigate, quantity, setIsOpen, user]);
 
   useEffect(() => {
     const handleOpen = () => handleDirectPurchase();

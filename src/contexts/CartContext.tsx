@@ -1,5 +1,8 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { CartItem, Product } from '@/types';
+import { useAuth } from '@/contexts/AuthContext';
+import { apiClient } from '@/api/client';
+import { toast } from 'sonner';
 
 interface CartContextType {
   items: CartItem[];
@@ -16,6 +19,8 @@ interface CartContextType {
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+
   const [items, setItems] = useState<CartItem[]>(() => {
     try {
       const saved = localStorage.getItem('cart');
@@ -29,6 +34,26 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, [items]);
 
   const addItem = useCallback((product: Product, quantity = 1, openDrawer = true) => {
+    if (!user) {
+      toast.info('Please sign in or create an account to add items to your cart.');
+      const currentPath = window.location.pathname + window.location.search;
+      window.location.href = `/auth?redirect=${encodeURIComponent(currentPath)}`;
+      return;
+    }
+
+    // Capture CRM lead for Add to Cart
+    apiClient.post('/leads', {
+      name: user.full_name || 'Customer',
+      phone: user.phone || '',
+      email: user.email?.endsWith('@ww.internal') ? '' : user.email,
+      source: 'add_to_cart',
+      quantity: quantity,
+      product_name: product.name || 'Electric Coconut Scraper',
+      status: 'new_lead',
+      notes: `Added ${quantity} unit(s) of ${product.name} to cart`,
+      user_id: user.id,
+    }).catch((err) => console.warn('[CRM Lead Cart Error]', err));
+
     setItems(prev => {
       const existing = prev.find(item => item.product.id === product.id);
       if (existing) {
@@ -42,7 +67,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       return [...prev, { product, quantity: Math.min(quantity, product.stock) }];
     });
     if (openDrawer) setIsOpen(true);
-  }, []);
+  }, [user]);
 
   const removeItem = useCallback((productId: string) => {
     setItems(prev => prev.filter(item => item.product.id !== productId));
@@ -60,7 +85,21 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           : item
       )
     );
-  }, []);
+
+    if (user?.phone) {
+      apiClient.post('/leads', {
+        name: user.full_name || 'Customer',
+        phone: user.phone,
+        email: user.email?.endsWith('@ww.internal') ? '' : user.email,
+        source: 'add_to_cart',
+        quantity: quantity,
+        product_name: 'Electric Coconut Scraper',
+        status: 'new_lead',
+        notes: `Cart quantity updated to ${quantity} unit(s)`,
+        user_id: user.id,
+      }).catch(() => {});
+    }
+  }, [user]);
 
   const clearCart = useCallback(() => setItems([]), []);
 
