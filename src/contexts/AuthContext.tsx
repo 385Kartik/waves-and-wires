@@ -65,9 +65,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setLoading] = useState(true);
 
   async function handleSession(sess: Session | null) {
-    if (!sess?.user) { setUser(null); setSession(null); setLoading(false); return; }
+    if (!sess?.user) {
+      setUser(null);
+      setSession(null);
+      setLoading(false);
+      try {
+        localStorage.removeItem('user_phone');
+        localStorage.removeItem('user_name');
+      } catch {}
+      return;
+    }
     setSession(sess);
     setUser(sess.user);
+    try {
+      if (sess.user.phone) localStorage.setItem('user_phone', sess.user.phone);
+      if (sess.user.full_name) localStorage.setItem('user_name', sess.user.full_name);
+    } catch {}
     setLoading(false);
   }
 

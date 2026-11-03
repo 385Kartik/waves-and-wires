@@ -41,31 +41,35 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // Capture CRM lead for Add to Cart
-    apiClient.post('/leads', {
-      name: user.full_name || 'Customer',
-      phone: user.phone || '',
-      email: user.email?.endsWith('@ww.internal') ? '' : user.email,
-      source: 'add_to_cart',
-      quantity: quantity,
-      product_name: product.name || 'Electric Coconut Scraper',
-      status: 'new_lead',
-      notes: `Added ${quantity} unit(s) of ${product.name} to cart`,
-      user_id: user.id,
-    }).catch((err) => console.warn('[CRM Lead Cart Error]', err));
+    let finalTotalQty = quantity;
 
     setItems(prev => {
       const existing = prev.find(item => item.product.id === product.id);
       if (existing) {
         const newQty = openDrawer ? existing.quantity + quantity : quantity;
-        // Cap at stock
-        const capped = Math.min(newQty, product.stock);
+        finalTotalQty = Math.min(newQty, product.stock);
         return prev.map(item =>
-          item.product.id === product.id ? { ...item, quantity: capped } : item
+          item.product.id === product.id ? { ...item, quantity: finalTotalQty } : item
         );
       }
-      return [...prev, { product, quantity: Math.min(quantity, product.stock) }];
+      finalTotalQty = Math.min(quantity, product.stock);
+      return [...prev, { product, quantity: finalTotalQty }];
     });
+
+    // Capture CRM lead for Add to Cart with the NEW TOTAL QUANTITY
+    const phone = user.phone || localStorage.getItem('user_phone') || '';
+    apiClient.post('/leads', {
+      name: user.full_name || localStorage.getItem('user_name') || 'Customer',
+      phone: phone,
+      email: user.email?.endsWith('@ww.internal') ? '' : (user.email || ''),
+      source: 'add_to_cart',
+      quantity: finalTotalQty,
+      product_name: product.name || 'Electric Coconut Scraper',
+      status: 'new_lead',
+      notes: `Cart updated to ${finalTotalQty} unit(s) of ${product.name}`,
+      user_id: user.id,
+    }).catch((err) => console.warn('[CRM Lead Cart Error]', err));
+
     if (openDrawer) setIsOpen(true);
   }, [user]);
 
@@ -78,27 +82,29 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       setItems(prev => prev.filter(item => item.product.id !== productId));
       return;
     }
+
+    const cappedQty = Math.max(1, Math.min(quantity, 10));
+
     setItems(prev =>
       prev.map(item =>
         item.product.id === productId
-          ? { ...item, quantity: Math.min(quantity, item.product.stock) }  // Cap at stock
+          ? { ...item, quantity: Math.min(cappedQty, item.product.stock) }
           : item
       )
     );
 
-    if (user?.phone) {
-      apiClient.post('/leads', {
-        name: user.full_name || 'Customer',
-        phone: user.phone,
-        email: user.email?.endsWith('@ww.internal') ? '' : user.email,
-        source: 'add_to_cart',
-        quantity: quantity,
-        product_name: 'Electric Coconut Scraper',
-        status: 'new_lead',
-        notes: `Cart quantity updated to ${quantity} unit(s)`,
-        user_id: user.id,
-      }).catch(() => {});
-    }
+    const phone = user?.phone || localStorage.getItem('user_phone') || '';
+    apiClient.post('/leads', {
+      name: user?.full_name || localStorage.getItem('user_name') || 'Customer',
+      phone: phone,
+      email: user?.email?.endsWith('@ww.internal') ? '' : (user?.email || ''),
+      source: 'add_to_cart',
+      quantity: cappedQty,
+      product_name: 'Electric Coconut Scraper',
+      status: 'new_lead',
+      notes: `Cart quantity updated to ${cappedQty} unit(s)`,
+      user_id: user?.id,
+    }).catch((err) => console.warn('[CRM Lead Update Qty Error]', err));
   }, [user]);
 
   const clearCart = useCallback(() => setItems([]), []);
