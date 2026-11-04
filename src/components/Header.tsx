@@ -36,12 +36,12 @@ export default function Header() {
         {/* Minimal Nav Anchor Links (Desktop) */}
         <nav className="hidden md:flex items-center gap-6 lg:gap-8 text-[11px] font-bold uppercase tracking-[0.2em] text-[#6b5d4d]">
           <a href="/#overview" className="hover:text-[#d97706] transition-colors">Overview</a>
-          <a href="/#design" className="hover:text-[#d97706] transition-colors">Design & Quality</a>
+          <a href="/#design" className="hover:text-[#d97706] transition-colors">Design &amp; Quality</a>
           <a href="/#details" className="hover:text-[#d97706] transition-colors">Details</a>
           <a href="/#features" className="hover:text-[#d97706] transition-colors">Features</a>
+          <a href="/#faq" className="hover:text-[#d97706] transition-colors">FAQs</a>
           <a href="/#reviews" className="hover:text-[#d97706] transition-colors">Reviews</a>
           <a href="/contact-us" className="hover:text-[#d97706] transition-colors">Contact Us</a>
-          
         </nav>
 
         {/* Right Actions: Purchase Button, Account, Cart & Mobile Menu Toggle */}
@@ -123,6 +123,13 @@ export default function Header() {
               className="px-3 py-2.5 rounded-lg bg-white/80 border border-amber-900/10 hover:border-[#eab308] text-[#1a1714]"
             >
               Features
+            </a>
+            <a
+              href="/#faq"
+              onClick={() => setMobileMenuOpen(false)}
+              className="px-3 py-2.5 rounded-lg bg-white/80 border border-amber-900/10 hover:border-[#eab308] text-[#1a1714]"
+            >
+              FAQs
             </a>
             <a
               href="/#reviews"

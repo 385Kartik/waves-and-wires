@@ -1,72 +1,111 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
     <loc>https://wavesandwires.in/</loc>
+    <lastmod>2026-11-03</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
+    <image:image>
+      <image:loc>https://wavesandwires.in/product/scraper-angle-clean.png</image:loc>
+      <image:title>Waves and Wires Electric Coconut Scrapper Machine Model M01</image:title>
+      <image:caption>Electric Coconut Scrapper with 150W pure copper motor and SS 304 stainless steel blades</image:caption>
+    </image:image>
+    <image:image>
+      <image:loc>https://wavesandwires.in/product/scraper-hero-main.jpg</image:loc>
+      <image:title>Electric Coconut Scraper in Indian Kitchen Setup</image:title>
+      <image:caption>Compact and stylish electric coconut scrapper machine on granite countertop</image:caption>
+    </image:image>
+    <image:image>
+      <image:loc>https://wavesandwires.in/product/scraper-action-main.jpg</image:loc>
+      <image:title>Fresh Coconut Shredding with Electric Coconut Scrapper</image:title>
+      <image:caption>Rapid coconut grating producing fluffy uniform coconut flakes in seconds</image:caption>
+    </image:image>
+    <image:image>
+      <image:loc>https://wavesandwires.in/product/scraper-cap-main.jpg</image:loc>
+      <image:title>Electric Coconut Scrapper with Protective Safety Guard Cap</image:title>
+      <image:caption>Child-safe protective cutter guard cap and vacuum suction base</image:caption>
+    </image:image>
+    <image:image>
+      <image:loc>https://wavesandwires.in/product/scraper-features.png</image:loc>
+      <image:title>Exploded Diagram and Specifications of Electric Coconut Scrapper</image:title>
+      <image:caption>150W high torque motor, food-grade blades, vacuum lock base</image:caption>
+    </image:image>
   </url>
   <url>
     <loc>https://wavesandwires.in/product/electric-coconut-scraper/</loc>
+    <lastmod>2026-11-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.95</priority>
+    <image:image>
+      <image:loc>https://wavesandwires.in/product/scraper-angle-clean.png</image:loc>
+      <image:title>Waves and Wires Electric Coconut Scrapper</image:title>
+      <image:caption>Official Model M01 Electric Coconut Scrapper Machine India</image:caption>
+    </image:image>
   </url>
   <url>
     <loc>https://wavesandwires.in/product-category/coconut-scraper/</loc>
+    <lastmod>2026-11-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>
   </url>
   <url>
     <loc>https://wavesandwires.in/shop/</loc>
+    <lastmod>2026-11-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://wavesandwires.in/about-us/</loc>
+    <lastmod>2026-11-03</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://wavesandwires.in/contact/</loc>
+    <lastmod>2026-11-03</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://wavesandwires.in/blog/</loc>
-    <changefreq>weekly</changefreq>
+    <loc>https://wavesandwires.in/contact-us/</loc>
+    <lastmod>2026-11-03</lastmod>
+    <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://wavesandwires.in/help-center/</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-  </url>
-  <url>
-    <loc>https://wavesandwires.in/careers/</loc>
+    <lastmod>2026-11-03</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
     <loc>https://wavesandwires.in/privacy-policy/</loc>
+    <lastmod>2026-11-03</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
     <loc>https://wavesandwires.in/refund-and-returns-policy/</loc>
+    <lastmod>2026-11-03</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
     <loc>https://wavesandwires.in/terms-and-conditions/</loc>
+    <lastmod>2026-11-03</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
     <loc>https://wavesandwires.in/shipping-rates-and-policies/</loc>
+    <lastmod>2026-11-03</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
     <loc>https://wavesandwires.in/order-tracking/</loc>
+    <lastmod>2026-11-03</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>

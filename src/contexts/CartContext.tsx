@@ -34,41 +34,36 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, [items]);
 
   const addItem = useCallback((product: Product, quantity = 1, openDrawer = true) => {
-    if (!user) {
-      toast.info('Please sign in or create an account to add items to your cart.');
-      const currentPath = window.location.pathname + window.location.search;
-      window.location.href = `/auth?redirect=${encodeURIComponent(currentPath)}`;
-      return;
-    }
-
     let finalTotalQty = quantity;
 
     setItems(prev => {
       const existing = prev.find(item => item.product.id === product.id);
       if (existing) {
         const newQty = openDrawer ? existing.quantity + quantity : quantity;
-        finalTotalQty = Math.min(newQty, product.stock);
+        finalTotalQty = Math.min(newQty, product.stock || 50);
         return prev.map(item =>
           item.product.id === product.id ? { ...item, quantity: finalTotalQty } : item
         );
       }
-      finalTotalQty = Math.min(quantity, product.stock);
+      finalTotalQty = Math.min(quantity, product.stock || 50);
       return [...prev, { product, quantity: finalTotalQty }];
     });
 
-    // Capture CRM lead for Add to Cart with the NEW TOTAL QUANTITY
-    const phone = user.phone || localStorage.getItem('user_phone') || '';
-    apiClient.post('/leads', {
-      name: user.full_name || localStorage.getItem('user_name') || 'Customer',
-      phone: phone,
-      email: user.email?.endsWith('@ww.internal') ? '' : (user.email || ''),
-      source: 'add_to_cart',
-      quantity: finalTotalQty,
-      product_name: product.name || 'Electric Coconut Scraper',
-      status: 'new_lead',
-      notes: `Cart updated to ${finalTotalQty} unit(s) of ${product.name}`,
-      user_id: user.id,
-    }).catch((err) => console.warn('[CRM Lead Cart Error]', err));
+    // Capture CRM lead for Add to Cart if user is available
+    if (user) {
+      const phone = user.phone || localStorage.getItem('user_phone') || '';
+      apiClient.post('/leads', {
+        name: user.full_name || localStorage.getItem('user_name') || 'Customer',
+        phone: phone,
+        email: user.email?.endsWith('@ww.internal') ? '' : (user.email || ''),
+        source: 'add_to_cart',
+        quantity: finalTotalQty,
+        product_name: product.name || 'Electric Coconut Scraper',
+        status: 'new_lead',
+        notes: `Cart updated to ${finalTotalQty} unit(s) of ${product.name}`,
+        user_id: user.id,
+      }).catch((err) => console.warn('[CRM Lead Cart Error]', err));
+    }
 
     if (openDrawer) setIsOpen(true);
   }, [user]);

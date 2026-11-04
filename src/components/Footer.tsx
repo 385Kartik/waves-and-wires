@@ -11,7 +11,7 @@ export default function Footer() {
       {/* Top 4-Column Links Section */}
       <div className="w-full bg-[#f5f1e8] py-12 sm:py-16">
         <div className="w-full max-w-[1400px] mx-auto px-4 sm:px-10 lg:px-14">
-          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-8 sm:gap-10">
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-8 sm:gap-10">
             {/* Column 1: Useful Links */}
             <div className="space-y-4">
               <h4 className="text-sm sm:text-[15px] font-bold text-[#111827]">
@@ -25,35 +25,45 @@ export default function Footer() {
                 </li>
                 <li>
                   <Link to="/refund-and-returns-policy" className="hover:text-[#d97706] transition-colors">
-                    Refund and Returns Policy
+                    Refund &amp; Returns Policy
                   </Link>
                 </li>
                 <li>
                   <Link to="/terms-and-conditions" className="hover:text-[#d97706] transition-colors">
-                    Terms and Conditions
+                    Terms &amp; Conditions
                   </Link>
                 </li>
               </ul>
             </div>
 
-            {/* Column 2: Product Categories */}
-            {/* <div className="space-y-4">
+            {/* Column 2: Coconut Scrapper & Guides (SEO Anchor Links) */}
+            <div className="space-y-4">
               <h4 className="text-sm sm:text-[15px] font-bold text-[#111827]">
-                Product Categories
+                Coconut Scrapper
               </h4>
               <ul className="space-y-2.5 text-xs sm:text-[13px] text-[#64748b] font-medium">
                 <li>
-                  <Link to="/product-category/coconut-scraper" className="hover:text-[#d97706] transition-colors">
-                    Coconut Scraper
-                  </Link>
+                  <a href="/#overview" className="hover:text-[#d97706] transition-colors">
+                    Model M01 Scrapper
+                  </a>
                 </li>
                 <li>
-                  <Link to="/product-category/uncategorized" className="hover:text-[#d97706] transition-colors">
-                    Uncategorized
-                  </Link>
+                  <a href="/#features" className="hover:text-[#d97706] transition-colors">
+                    150W Motor &amp; SS Blades
+                  </a>
+                </li>
+                <li>
+                  <a href="/#faq" className="hover:text-[#d97706] transition-colors">
+                    Buyer FAQs &amp; Safety
+                  </a>
+                </li>
+                <li>
+                  <a href="/#reviews" className="hover:text-[#d97706] transition-colors">
+                    Verified Customer Reviews
+                  </a>
                 </li>
               </ul>
-            </div> */}
+            </div>
 
             {/* Column 3: Let Us Help You */}
             <div className="space-y-4">

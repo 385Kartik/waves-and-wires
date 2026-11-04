@@ -23,6 +23,7 @@ import FAQPage from "@/pages/FAQPage";
 import NotFound from "@/pages/NotFound";
 import AboutPage from '@/pages/AboutPage';
 import BlogPage from '@/pages/BlogPage';
+import BlogDetailPage from '@/pages/BlogDetailPage';
 import CareersPage from '@/pages/CareersPage';
 import CartPage from '@/pages/CartPage';
 import ScrollToTop from '@/components/ScrollToTop';
@@ -84,7 +85,7 @@ const App = () => (
                   <Route path="/about-us" element={<AboutPage />} />
                   <Route path="/blog" element={<BlogPage />} />
                   <Route path="/blog-2" element={<BlogPage />} />
-                  <Route path="/blog/:slug" element={<BlogPage />} />
+                  <Route path="/blog/:slug" element={<BlogDetailPage />} />
                   <Route path="/careers" element={<CareersPage />} />
                 </Route>
                 <Route path="*" element={<NotFound />} />

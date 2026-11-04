@@ -17,7 +17,7 @@ const STATES = ['Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisga
 const inputCls = 'w-full rounded-xl border border-border bg-secondary/60 px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 transition-all';
 
 export default function CheckoutPage() {
-  const { items, subtotal, clearCart } = useCart();
+  const { items, subtotal, clearCart, addItem } = useCart();
   const { user }  = useAuth();
   const navigate  = useNavigate();
 
@@ -49,6 +49,39 @@ export default function CheckoutPage() {
       address_line_1: '', address_line_2: '', city: '', state: '', postal_code: '', country: 'India',
     };
   });
+
+  // Auto-recovery: If customer arrives at checkout with an empty cart, auto-load Model M01
+  useEffect(() => {
+    if (items.length === 0) {
+      const savedCart = localStorage.getItem('cart');
+      if (!savedCart || savedCart === '[]' || savedCart === 'null') {
+        addItem(
+          {
+            id: 'prod-5',
+            name: 'Waves & Wires Electric Coconut Scraper Model M01',
+            slug: 'electric-coconut-scraper-pro',
+            price: 2550,
+            compare_at_price: 3499,
+            images: [
+              '/product/scraper-angle-clean.png',
+              '/product/scraper-hero-main.jpg',
+              '/product/scraper-action-main.jpg',
+              '/product/scraper-cap-main.jpg',
+            ],
+            category_id: 'cat-2',
+            category_name: 'Kitchen & Appliances',
+            stock: 50,
+            sku: 'WW-CS-001',
+            description: 'Waves and Wires Electric Coconut Scraper Model M01',
+            rating: 5.0,
+            review_count: 30,
+          } as any,
+          1,
+          false
+        );
+      }
+    }
+  }, [items.length, addItem]);
 
   useEffect(() => {
     try { localStorage.setItem('ww_checkout_address', JSON.stringify(address)); } catch { /* ignore */ }
@@ -91,6 +124,11 @@ export default function CheckoutPage() {
   }
 
   function validateAddress() {
+    if (items.length === 0 || subtotal <= 0) {
+      toast.error('Your cart is empty. Please select a product.');
+      navigate('/');
+      return false;
+    }
     const req = ['full_name','phone','address_line_1','city','state','postal_code'] as const;
     const missing = req.find(k => !address[k]?.trim());
     if (missing) { toast.error(`Please fill: ${missing.replace(/_/g,' ')}`); return false; }
@@ -186,6 +224,11 @@ export default function CheckoutPage() {
   // ── COD ──────────────────────────────────────────────────────────────────
   async function placeCOD() {
     if (!user) { toast.error('Sign in first'); navigate('/auth'); return; }
+    if (total <= 0 || items.length === 0) {
+      toast.error('Invalid order amount. Your cart is empty.');
+      navigate('/');
+      return;
+    }
     if (!user.phone_verified && !user.email_verified) {
       toast.error('Please verify your phone number or email before placing orders.');
       navigate('/account');
@@ -213,6 +256,11 @@ export default function CheckoutPage() {
   // ── PHONEPE ───────────────────────────────────────────────────────────────
   async function placePhonePe() {
     if (!user) { toast.error('Sign in first'); navigate('/auth'); return; }
+    if (total <= 0 || items.length === 0) {
+      toast.error('Invalid order amount. Your cart is empty.');
+      navigate('/');
+      return;
+    }
     if (!user.phone_verified && !user.email_verified) {
       toast.error('Please verify your phone number or email before placing orders.');
       navigate('/account');
@@ -235,9 +283,7 @@ export default function CheckoutPage() {
       const data = await res.json();
 
       if (data.success && data.redirectUrl) {
-        // 3. Clear cart and redirect to PhonePe
-        // Shiprocket push happens ONLY after payment confirmed (admin panel or webhook)
-        clearCart();
+        // Redirect to PhonePe (Cart will be cleared once payment is confirmed in PaymentCallback)
         window.location.href = data.redirectUrl;
       } else {
         // Payment initiation failed — cancel the order we just created

@@ -15,11 +15,58 @@ import {
 } from '@/data/scraperReviews';
 
 const SHOWCASE_IMAGES = [
-  { src: '/product/scraper-angle-clean.png', label: 'Rotary Blade View' },
-  { src: '/product/scraper-hero-main.jpg', label: 'Studio Kitchen View' },
-  { src: '/product/scraper-action-main.jpg', label: 'In Action Shredding' },
-  { src: '/product/scraper-cap-main.jpg', label: 'With Safety Guard' },
-  { src: '/product/scraper-features.png', label: 'Parts Overview' },
+  {
+    src: '/product/scraper-angle-clean.png',
+    label: 'Rotary Blade View',
+    alt: 'Waves and Wires Electric Coconut Scrapper stainless steel rotating blade head',
+  },
+  {
+    src: '/product/scraper-hero-main.jpg',
+    label: 'Studio Kitchen View',
+    alt: 'Waves and Wires Electric Coconut Scraper Machine on modern Indian kitchen countertop',
+  },
+  {
+    src: '/product/scraper-action-main.jpg',
+    label: 'In Action Shredding',
+    alt: 'Fresh coconut shredding in action using Waves & Wires electric coconut scrapper',
+  },
+  {
+    src: '/product/scraper-cap-main.jpg',
+    label: 'With Safety Guard',
+    alt: 'Electric coconut scrapper machine with protective safety cap and vacuum base',
+  },
+  {
+    src: '/product/scraper-features.png',
+    label: 'Parts Overview',
+    alt: 'Exploded parts and specifications of Waves and Wires electric coconut scraper',
+  },
+];
+
+const HOME_FAQS = [
+  {
+    q: 'How does the Waves & Wires Electric Coconut Scrapper work?',
+    a: 'The Waves and Wires Electric Coconut Scrapper features a 150W high-torque pure-copper motor rotating at 1000 RPM. Place the fresh coconut half firmly against the surgical SS 304 food-grade stainless steel blade, press the top momentary power button, and gently rotate the shell. In under 5 minutes, you get fluffy, perfectly grated coconut with zero manual strain or hand blisters.',
+  },
+  {
+    q: 'Why choose an electric coconut scrapper over traditional manual graters or mixer grinder jars?',
+    a: 'Traditional manual scrapers require intense physical effort and take 20 to 30 minutes of exhausting labor. Mixer grinders tend to crush coconuts into a mushy, watery paste that loses authentic texture. The Waves & Wires electric coconut scrapper produces airy, authentic South Indian style coconut flakes ideal for gravies, chutneys, avial, sweets, and fresh coconut milk.',
+  },
+  {
+    q: 'Are the coconut scrapper blades rust-proof and food-safe?',
+    a: 'Yes, absolutely! The rotary blade is crafted from certified surgical SS 304 food-grade stainless steel with precision laser-honed teeth. It is completely rust-proof, non-toxic, easy to wash, and built for years of heavy daily grating.',
+  },
+  {
+    q: 'Is this electric coconut scrapper safe to use at home?',
+    a: 'Safety is paramount. Model M01 is equipped with a heavy-duty industrial vacuum suction lock base that firmly grips onto smooth granite, marble, or tiled kitchen platforms, preventing slipping and vibrations. It also comes with an instant safety release push switch and a protective blade guard cap for safe storage.',
+  },
+  {
+    q: 'What is the warranty and return policy on the coconut scraper?',
+    a: 'Every machine comes with a 1-Year Comprehensive Manufacturer Warranty by Waves and Wires Technologies LLP (your invoice serves as your warranty card). We also provide a 7-day hassle-free replacement policy and direct customer care assistance.',
+  },
+  {
+    q: 'What is the price of the electric coconut scrapper and how do I order?',
+    a: 'The official price is ₹2,550 (MRP ₹3,499) with Free Delivery across India. You can purchase directly on this official website using Cash on Delivery (COD), UPI (Google Pay, PhonePe, Paytm), Credit/Debit Cards, or Net Banking.',
+  },
 ];
 
 const M01_PRODUCT = {
@@ -62,6 +109,7 @@ export default function HomePage() {
   const [featureImgIdx, setFeatureImgIdx] = useState(1);
   const [openDesignDropdown, setOpenDesignDropdown] = useState<string | null>('overview');
   const [openFeatureDropdown, setOpenFeatureDropdown] = useState<string | null>('features');
+  const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [reviews, setReviews] = useState<ScraperReview[]>(OFFICIAL_SCRAPER_REVIEWS);
   const [showAllReviews, setShowAllReviews] = useState(false);
 
@@ -78,13 +126,17 @@ export default function HomePage() {
   const totalPrice = quantity === 2 ? unitPrice * 2 - 200 : unitPrice * quantity;
 
   const handleDirectPurchase = useCallback(() => {
+    // 1. Always ensure product is stored in cart first with selected quantity
+    addItem(M01_PRODUCT, quantity, false);
+    setIsOpen(false);
+
+    // 2. If user is not logged in, prompt and redirect to auth
     if (!user) {
-      toast.info('Please sign in or create an account to purchase.');
       navigate('/auth?redirect=/checkout');
       return;
     }
-    setIsOpen(false);
-    addItem(M01_PRODUCT, quantity, false);
+
+    // 3. If logged in, proceed directly to checkout
     navigate('/checkout');
   }, [addItem, navigate, quantity, setIsOpen, user]);
 
@@ -214,7 +266,7 @@ export default function HomePage() {
               <div className="flex mt-2 flex-wrap items-center gap-2 sm:gap-3 pt-1 sm:pt-2">
                 <span className="h-[1.5px] w-5 sm:w-8 bg-[#eab308] shrink-0" />
                 <span className="text-[10px] sm:text-xs font-black uppercase tracking-[0.18em] sm:tracking-[0.28em] text-[#8c6b32]">
-                  ELECTRIC COCONUT SCRAPER
+                  ELECTRIC COCONUT SCRAPPER &amp; SCRAPER MACHINE
                 </span>
                 <span className="h-[1.5px] w-6 sm:w-10 bg-[#eab308] hidden xs:block shrink-0" />
                 <a
@@ -226,14 +278,14 @@ export default function HomePage() {
                       <Star key={i} className="h-3 w-3 fill-[#eab308] text-[#eab308]" />
                     ))}
                   </span>
-                  <span>5.0/5  ({reviews.length} Reviews)</span>
+                  <span>5.0/5 ({reviews.length} Reviews)</span>
                 </a>
               </div>
             </div>
 
-            {/* Crisp, Short Product Summary */}
+            {/* Crisp, Keyword-Rich Product Summary */}
             <p className="text-xs sm:text-base text-[#4a4237] max-w-lg font-normal leading-relaxed pt-0.5">
-              Effortlessly shred fresh coconut into fluffy flakes in seconds — powered by a 150W high-torque motor, sharp SS 304 stainless steel blades, and a rock-solid vacuum lock base.
+              India's premier <strong>electric coconut scrapper</strong> machine. Effortlessly shred whole fresh coconuts into uniform fluffy flakes in under 5 minutes — powered by a heavy-duty 150W high-torque motor, food-grade SS 304 stainless steel rotary blades, and a rock-solid vacuum suction base.
             </p>
 
             {/* Direct Home Page Quantity Selector & Purchase Suite */}
@@ -560,12 +612,9 @@ export default function HomePage() {
                 360° VISUAL GALLERY
               </span>
               <h2 className="text-2xl sm:text-4xl font-black text-[#1c1917] tracking-tight uppercase mt-1">
-                BUILT FOR EVERY INDIAN KITCHEN
+                BUILT FOR EVERY INDIAN KITCHEN – ELECTRIC COCONUT SCRAPPER
               </h2>
             </div>
-            {/* <p className="text-xs sm:text-sm font-semibold text-[#6b5d4d]">
-              Click any angle in the showcase to inspect closer
-            </p> */}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-5">
@@ -578,7 +627,7 @@ export default function HomePage() {
                 <div className="aspect-square w-full flex items-center justify-center p-1.5 overflow-hidden">
                   <img
                     src={card.src}
-                    alt={card.label}
+                    alt={card.alt || card.label}
                     className={`h-full w-full ${
                       card.src.endsWith('.jpg') ? 'object-cover rounded-xs' : 'object-contain'
                     } filter drop-shadow-[0_15px_20px_rgba(0,0,0,0.15)] group-hover:scale-110 transition-transform duration-500 ease-out`}
@@ -608,7 +657,7 @@ export default function HomePage() {
                   ENGINEERED PERFORMANCE
                 </span>
                 <h2 className="text-3xl sm:text-5xl font-black text-[#1c1917] tracking-tight uppercase">
-                  FEATURES
+                  150W COCONUT SCRAPPER FEATURES
                 </h2>
               </div>
 
@@ -827,7 +876,7 @@ export default function HomePage() {
                 </span>
               </div>
               <h2 className="text-3xl sm:text-5xl font-black text-[#1c1917] tracking-tight uppercase">
-                REVIEWS ({reviews.length})
+                REVIEWS &amp; RATINGS – ELECTRIC COCONUT SCRAPPER ({reviews.length})
               </h2>
             </div>
 
@@ -1043,6 +1092,109 @@ export default function HomePage() {
               </form>
             </div>
 
+          </div>
+        </div>
+      </section>
+
+      {/* ── 7. FREQUENTLY ASKED QUESTIONS (FAQ) & BUYER GUIDE ───────────────── */}
+      <section id="faq" className="w-full px-4 sm:px-10 md:px-14 lg:px-20 py-14 sm:py-20 lg:py-24 bg-[#faf5ea] border-b border-amber-900/10">
+        <div className="w-full max-w-[1400px] mx-auto space-y-10 sm:space-y-12">
+          
+          <div className="text-center max-w-3xl mx-auto space-y-3">
+            <span className="text-[11px] font-black uppercase tracking-[0.25em] text-[#d97706] block">
+              BUYER GUIDE &amp; QUERIES
+            </span>
+            <h2 className="text-3xl sm:text-5xl font-black text-[#1c1917] tracking-tight uppercase">
+              FREQUENTLY ASKED QUESTIONS (FAQ)
+            </h2>
+            <p className="text-xs sm:text-base text-[#6b5d4d] leading-relaxed">
+              Everything you need to know about the Waves &amp; Wires Electric Coconut Scrapper Model M01, maintenance, safety, and delivery across India.
+            </p>
+          </div>
+
+          <div className="max-w-4xl mx-auto space-y-3">
+            {HOME_FAQS.map((faq, idx) => {
+              const isOpen = openFaq === idx;
+              return (
+                <div
+                  key={idx}
+                  className="border-2 border-[#eab308]/60 bg-[#fffdf9] shadow-xs transition-all overflow-hidden"
+                >
+                  <button
+                    type="button"
+                    onClick={() => setOpenFaq(isOpen ? null : idx)}
+                    className="w-full flex items-center justify-between gap-4 p-4 sm:p-5 text-left font-black text-xs sm:text-sm uppercase tracking-wider text-[#1c1917] hover:bg-yellow-400/10 transition-colors"
+                  >
+                    <span className="flex items-center gap-3">
+                      <span className="text-[#d97706] font-black text-xs sm:text-sm">0{idx + 1}.</span>
+                      <span>{faq.q}</span>
+                    </span>
+                    <ChevronDown
+                      className={`h-4 w-4 sm:h-5 sm:w-5 text-[#d97706] shrink-0 transition-transform duration-300 ${
+                        isOpen ? 'rotate-180' : ''
+                      }`}
+                    />
+                  </button>
+
+                  {isOpen && (
+                    <div className="px-4 sm:px-5 pb-5 pt-1 text-xs sm:text-sm text-[#4a4237] leading-relaxed border-t border-amber-900/10 bg-[#fffefc] animate-in fade-in-50 duration-200">
+                      {faq.a}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="text-center pt-2">
+            <p className="text-xs sm:text-sm font-semibold text-[#6b5d4d]">
+              Have more questions?{' '}
+              <a
+                href="https://wa.me/916009595600"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#d97706] hover:underline font-bold inline-flex items-center gap-1"
+              >
+                Chat directly with our team on WhatsApp (+91 60095 95600) →
+              </a>
+            </p>
+          </div>
+
+        </div>
+      </section>
+
+      {/* ── 8. LUXURY SEO KEYWORD INDEX / POPULAR TAGS BAR ───────────────────── */}
+      <section className="w-full px-4 sm:px-10 lg:px-20 py-8 bg-[#f2ebd9] border-b border-amber-900/10">
+        <div className="w-full max-w-[1700px] mx-auto space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="h-[2px] w-5 bg-[#eab308]" />
+            <h3 className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-[#8c6b32]">
+              POPULAR SEARCHES &amp; CATEGORIES
+            </h3>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-[11px] sm:text-xs text-[#5c5346]">
+            {[
+              'Electric Coconut Scrapper',
+              'Coconut Scraper Machine',
+              'Electric Coconut Grater',
+              'Automatic Coconut Scrapper India',
+              'SS 304 Stainless Steel Blades',
+              'Coconut Shredder Machine',
+              'Commercial Coconut Grater',
+              'Coconut Scrapper Mumbai',
+              '150W Electric Coconut Scraper',
+              'Coconut Scraper Machine Price',
+              'Best Coconut Scrapper India',
+              'Buy Coconut Scrapper Online',
+              'Waves & Wires Model M01',
+            ].map((tag) => (
+              <span
+                key={tag}
+                className="px-2.5 py-1 rounded bg-[#fffdf8] border border-amber-900/15 text-[#1c1917] font-semibold tracking-tight shadow-2xs hover:border-[#eab308] transition-colors cursor-default"
+              >
+                #{tag}
+              </span>
+            ))}
           </div>
         </div>
       </section>

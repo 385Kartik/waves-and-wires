@@ -4,26 +4,33 @@ import { useLocation } from 'react-router-dom';
 interface PageSEO {
   title: string;
   description: string;
+  keywords?: string;
   canonicalPath?: string;
 }
 
 const ROUTE_SEO: Record<string, PageSEO> = {
   '/': {
-    title: 'Waves and Wires Technologies – Electric Coconut Scraper | Official Store',
+    title: 'Electric Coconut Scrapper & Scraper Machine | Waves and Wires Technologies Official',
     description:
-      'Buy the official Waves and Wires Electric Coconut Scraper (Model M01). Powerful 150W high-torque motor, sharp SS 304 stainless steel blades, heavy-duty vacuum lock base, and 1-year warranty. Free shipping & COD across India.',
+      'Buy India\'s top-rated Waves and Wires Electric Coconut Scrapper (Model M01). 150W high-torque motor, food-grade SS 304 stainless steel blades, heavy-duty vacuum lock base & 1-year warranty. Fast delivery & COD across India.',
+    keywords:
+      'coconut, scrapper, coconut scrapper, coconut scraper, electric coconut scrapper, coconut scrapper machine, electric coconut scraper, automatic coconut scrapper, coconut grater, coconut grater machine, electric coconut grater, coconut shredder, electric coconut shredder machine, waves and wires, waves and wires coconut scrapper, buy coconut scrapper online, coconut scrapper price in india, best coconut scrapper',
     canonicalPath: '/',
   },
   '/product/electric-coconut-scraper': {
-    title: 'Electric Coconut Scraper – Waves and Wires Technologies',
+    title: 'Electric Coconut Scrapper & Grater Machine (Model M01) – Waves and Wires',
     description:
-      'Our Electric Coconut Scraper transforms the chore of coconut prep into a breeze. 150W motor, 1000 RPM, sharp stainless steel blades, vacuum base, and 1-year warranty.',
+      'Order the official Waves and Wires Electric Coconut Scrapper (Model M01). 150W motor, 1000 RPM, food-grade stainless steel blade, vacuum suction base, 1-year warranty. Pan-India delivery.',
+    keywords:
+      'electric coconut scrapper, electric coconut scraper, coconut scrapper machine, automatic coconut grater, coconut shredder, waves and wires',
     canonicalPath: '/product/electric-coconut-scraper',
   },
   '/product/electric-coconut-scraper-pro': {
-    title: 'Electric Coconut Scraper – Waves and Wires Technologies',
+    title: 'Electric Coconut Scrapper & Grater Machine (Model M01) – Waves and Wires',
     description:
-      'Our Electric Coconut Scraper transforms the chore of coconut prep into a breeze. 150W motor, 1000 RPM, sharp stainless steel blades, vacuum base, and 1-year warranty.',
+      'Order the official Waves and Wires Electric Coconut Scrapper (Model M01). 150W motor, 1000 RPM, food-grade stainless steel blade, vacuum suction base, 1-year warranty. Pan-India delivery.',
+    keywords:
+      'electric coconut scrapper, electric coconut scraper, coconut scrapper machine, automatic coconut grater, coconut shredder, waves and wires',
     canonicalPath: '/product/electric-coconut-scraper',
   },
   '/shop': {
@@ -150,6 +157,9 @@ export default function SEOHead() {
     };
 
     setMeta('meta[name="description"]', 'content', seo.description);
+    if (seo.keywords) {
+      setMeta('meta[name="keywords"]', 'content', seo.keywords);
+    }
     setMeta('meta[property="og:title"]', 'content', seo.title);
     setMeta('meta[property="og:description"]', 'content', seo.description);
     setMeta(
