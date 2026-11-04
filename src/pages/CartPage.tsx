@@ -4,9 +4,10 @@ import { useCart } from '@/contexts/CartContext';
 
 export default function CartPage() {
   const { items, removeItem, updateQuantity, itemCount, subtotal } = useCart();
-  const tax = Math.round(subtotal * 0.18);
   const shipping = subtotal > 0 ? 199 : 0;
-  const total = subtotal + tax + shipping;
+  const taxableSubtotal = subtotal + shipping;
+  const tax = Math.round(taxableSubtotal * 0.18);
+  const total = taxableSubtotal + tax;
 
   return (
     <div className="w-full max-w-[1400px] mx-auto px-4 sm:px-10 lg:px-14 py-10 sm:py-14">
@@ -122,7 +123,7 @@ export default function CartPage() {
                 <span className="font-semibold text-foreground">₹{subtotal.toLocaleString('en-IN')}</span>
               </div>
               <div className="flex justify-between text-muted-foreground">
-                <span>GST (18%)</span>
+                <span>GST (18% on Subtotal)</span>
                 <span className="font-semibold text-foreground">₹{tax.toLocaleString('en-IN')}</span>
               </div>
               <div className="flex justify-between text-muted-foreground">

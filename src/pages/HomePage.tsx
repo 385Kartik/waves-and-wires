@@ -65,7 +65,7 @@ const HOME_FAQS = [
   },
   {
     q: 'What is the price of the electric coconut scrapper and how do I order?',
-    a: 'The official base price is ₹2,300 (+ 18% GST = ₹2,714) with Express Shipping across India (₹199). You can purchase directly on this official website using Cash on Delivery (COD) or Online UPI (Google Pay, PhonePe, Paytm), Credit/Debit Cards, and Net Banking.',
+    a: 'The official base price is ₹2,300 (+ ₹199 Express Shipping & 18% GST). You can purchase directly on this official website using Cash on Delivery (COD) or Online UPI (Google Pay, PhonePe, Paytm), Credit/Debit Cards, and Net Banking.',
   },
 ];
 

@@ -161,8 +161,8 @@ export default function CartDrawer() {
                 <span className="font-bold text-stone-900">₹{subtotal.toLocaleString('en-IN')}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-stone-500">GST (18%)</span>
-                <span className="font-bold text-stone-900">₹{Math.round(subtotal * 0.18).toLocaleString('en-IN')}</span>
+                <span className="text-stone-500">GST (18% on Subtotal)</span>
+                <span className="font-bold text-stone-900">₹{Math.round((subtotal + shipping) * 0.18).toLocaleString('en-IN')}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-stone-500">Express Shipping</span>
@@ -171,7 +171,7 @@ export default function CartDrawer() {
               <div className="flex justify-between items-center pt-2 border-t border-stone-100">
                 <span className="font-black text-stone-900">Total</span>
                 <span className="text-lg font-black text-amber-500">
-                  ₹{(subtotal + Math.round(subtotal * 0.18) + shipping).toLocaleString('en-IN')}
+                  ₹{(subtotal + shipping + Math.round((subtotal + shipping) * 0.18)).toLocaleString('en-IN')}
                 </span>
               </div>
             </div>

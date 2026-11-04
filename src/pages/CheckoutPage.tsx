@@ -60,7 +60,7 @@ export default function CheckoutPage() {
             id: 'prod-5',
             name: 'Waves & Wires Electric Coconut Scraper Model M01',
             slug: 'electric-coconut-scraper-pro',
-            price: 2550,
+            price: 2300,
             compare_at_price: 3499,
             images: [
               '/product/scraper-angle-clean.png',
@@ -97,12 +97,12 @@ export default function CheckoutPage() {
     }
   }, [user]);
 
-  const shipping     = subtotal > 0 ? 199 : 0;
-  const codHandling  = (payMethod === 'cod' && subtotal > 0) ? 199 : 0;
-  const discount     = couponApplied?.discount ?? 0;
-  const taxBase      = subtotal;
-  const tax          = Math.round(taxBase * 0.18);
-  const total        = Math.max(0, taxBase + tax + shipping + codHandling - discount);
+  const shipping        = subtotal > 0 ? 199 : 0;
+  const codHandling     = (payMethod === 'cod' && subtotal > 0) ? 199 : 0;
+  const discount        = couponApplied?.discount ?? 0;
+  const taxableSubtotal = Math.max(0, subtotal + shipping + codHandling - discount);
+  const tax             = Math.round(taxableSubtotal * 0.18);
+  const total           = taxableSubtotal + tax;
 
   async function applyCoupon(codeToApply?: string) {
     const code = (typeof codeToApply === 'string' ? codeToApply : couponCode).toUpperCase().trim();
@@ -457,10 +457,10 @@ export default function CheckoutPage() {
             <p className="text-sm font-bold text-foreground">Order Summary</p>
             {[
               { label: 'Subtotal (Base Price)', val: subtotal },
-              { label: 'GST (18%)', val: tax },
               { label: 'Express Shipping', val: shipping },
               ...(codHandling > 0 ? [{ label: 'COD Handling Charges', val: codHandling }] : []),
               ...(discount > 0 ? [{ label: `Discount (${couponApplied?.code})`, val: -discount }] : []),
+              { label: 'GST (18% on Taxable Subtotal)', val: tax },
             ].map(({ label, val }) => (
               <div key={label} className="flex justify-between text-sm">
                 <span className="text-muted-foreground">{label}</span>

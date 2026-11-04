@@ -281,7 +281,7 @@ export default function BlogDetailPage() {
               <div className="text-center">
                 <span className="text-xs text-stone-400 line-through mr-2">₹4,999</span>
                 <span className="text-2xl sm:text-3xl font-black text-amber-400">₹2,300</span>
-                <span className="text-[10px] text-stone-400 block mt-0.5">+ 18% GST (₹2,714)</span>
+                <span className="text-[10px] text-stone-400 block mt-0.5">+ 18% GST</span>
               </div>
               <Link
                 to="/checkout"
