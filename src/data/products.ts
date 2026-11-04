@@ -155,7 +155,7 @@ export const products: Product[] = [
     slug: 'electric-coconut-scraper-pro',
     description: 'Our Electric Coconut Scraper transforms the chore of coconut prep into a breeze. This powerful yet easy-to-use appliance features sharp, stainless steel blades that make quick work of fresh coconut flesh. Simply press the coconut half against the rotating blade and watch fluffy flakes fill the convenient collection tray. Safe, efficient, and built to last, this electric scraper is a must-have for any kitchen that loves the taste of fresh coconut.',
     short_description: 'Upgrade your kitchen and enjoy the delicious taste of fresh coconut with ease',
-    price: 2550,
+    price: 2300,
     compare_at_price: 3499,
     images: [
       '/product/scraper-angle-clean.png',

@@ -280,7 +280,8 @@ export default function BlogDetailPage() {
             <div className="flex flex-col items-center gap-3 shrink-0 w-full sm:w-auto">
               <div className="text-center">
                 <span className="text-xs text-stone-400 line-through mr-2">₹4,999</span>
-                <span className="text-2xl sm:text-3xl font-black text-amber-400">₹2,550</span>
+                <span className="text-2xl sm:text-3xl font-black text-amber-400">₹2,300</span>
+                <span className="text-[10px] text-stone-400 block mt-0.5">+ 18% GST (₹2,714)</span>
               </div>
               <Link
                 to="/checkout"

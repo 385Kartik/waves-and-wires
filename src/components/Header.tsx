@@ -35,7 +35,7 @@ export default function Header() {
 
         {/* Minimal Nav Anchor Links (Desktop) */}
         <nav className="hidden md:flex items-center gap-6 lg:gap-8 text-[11px] font-bold uppercase tracking-[0.2em] text-[#6b5d4d]">
-          <a href="/#overview" className="hover:text-[#d97706] transition-colors">Overview</a>
+          <a href="/#overview" className="hover:text-[#d97706] transition-colors">Home</a>
           <a href="/#design" className="hover:text-[#d97706] transition-colors">Design &amp; Quality</a>
           <a href="/#details" className="hover:text-[#d97706] transition-colors">Details</a>
           <a href="/#features" className="hover:text-[#d97706] transition-colors">Features</a>

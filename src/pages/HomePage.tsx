@@ -65,7 +65,7 @@ const HOME_FAQS = [
   },
   {
     q: 'What is the price of the electric coconut scrapper and how do I order?',
-    a: 'The official price is ₹2,550 (MRP ₹3,499) with Free Delivery across India. You can purchase directly on this official website using Cash on Delivery (COD), UPI (Google Pay, PhonePe, Paytm), Credit/Debit Cards, or Net Banking.',
+    a: 'The official base price is ₹2,300 (+ 18% GST = ₹2,714) with Express Shipping across India (₹199). You can purchase directly on this official website using Cash on Delivery (COD) or Online UPI (Google Pay, PhonePe, Paytm), Credit/Debit Cards, and Net Banking.',
   },
 ];
 
@@ -73,7 +73,7 @@ const M01_PRODUCT = {
   id: 'prod-5',
   name: 'Waves & Wires Electric Coconut Scraper Model M01',
   slug: 'electric-coconut-scraper-pro',
-  price: 2550,
+  price: 2300,
   compare_at_price: 3499,
   images: [
     '/product/scraper-angle-clean.png',
@@ -122,8 +122,8 @@ export default function HomePage() {
   const [saveReviewerInfo, setSaveReviewerInfo] = useState(() => Boolean(localStorage.getItem('ww_reviewer_name')));
   const [submittingReview, setSubmittingReview] = useState(false);
 
-  const unitPrice = 2550;
-  const totalPrice = quantity === 2 ? unitPrice * 2 - 200 : unitPrice * quantity;
+  const unitPrice = 2300;
+  const totalPrice = unitPrice * quantity;
 
   const handleDirectPurchase = useCallback(() => {
     // 1. Always ensure product is stored in cart first with selected quantity

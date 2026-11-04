@@ -97,26 +97,49 @@ export default function CheckoutPage() {
     }
   }, [user]);
 
-  const shipping = subtotal > 0 ? 199 : 0;
-  const discount = couponApplied?.discount ?? 0;
-  const taxBase  = subtotal - discount;
-  const tax      = Math.round(taxBase * 0.18);
-  const total    = taxBase + shipping + tax;
+  const shipping     = subtotal > 0 ? 199 : 0;
+  const codHandling  = (payMethod === 'cod' && subtotal > 0) ? 199 : 0;
+  const discount     = couponApplied?.discount ?? 0;
+  const taxBase      = subtotal;
+  const tax          = Math.round(taxBase * 0.18);
+  const total        = Math.max(0, taxBase + tax + shipping + codHandling - discount);
 
-  async function applyCoupon() {
-    if (!couponCode.trim()) return;
+  async function applyCoupon(codeToApply?: string) {
+    const code = (typeof codeToApply === 'string' ? codeToApply : couponCode).toUpperCase().trim();
+    if (!code) return;
     setApplyingCoupon(true);
     try {
-      const res: any = await apiClient.post('/coupons/validate', { code: couponCode.toUpperCase().trim() });
+      const res: any = await apiClient.post('/coupons/validate', { code });
       const data = res?.data?.data ?? res?.data;
-      if ((!res?.success && !res?.data?.success) || !data) { toast.error('Invalid or expired coupon'); setApplyingCoupon(false); return; }
-      if (data.expires_at && new Date(data.expires_at) < new Date()) { toast.error('This coupon has expired'); setApplyingCoupon(false); return; }
-      if (data.usage_limit && data.used_count >= data.usage_limit) { toast.error('Coupon usage limit reached'); setApplyingCoupon(false); return; }
-      if (data.min_order_value && subtotal < data.min_order_value) { toast.error(`Min order ₹${data.min_order_value} required`); setApplyingCoupon(false); return; }
+      if ((!res?.success && !res?.data?.success) || !data) {
+        toast.error('Invalid or expired coupon');
+        setApplyingCoupon(false);
+        return;
+      }
+      if (data.expires_at && new Date(data.expires_at) < new Date()) {
+        toast.error('This coupon has expired');
+        setApplyingCoupon(false);
+        return;
+      }
+      if (data.usage_limit && data.used_count >= data.usage_limit) {
+        toast.error('Coupon usage limit reached');
+        setApplyingCoupon(false);
+        return;
+      }
+      if (data.min_order_value && subtotal < data.min_order_value) {
+        if (data.code === 'COMBO200') {
+          toast.error(`COMBO200 requires minimum 2 units (Min order ₹${data.min_order_value}). Add 1 more unit to save ₹200!`);
+        } else {
+          toast.error(`Min order ₹${data.min_order_value} required for this coupon`);
+        }
+        setApplyingCoupon(false);
+        return;
+      }
       let d = data.discount_type === 'percentage' ? (subtotal * data.discount_value) / 100 : data.discount_value;
       if (data.max_discount) d = Math.min(d, data.max_discount);
       setCouponApplied({ code: data.code, discount: Math.round(d), id: data.id });
-      toast.success(`Coupon applied! You save ₹${Math.round(d)}`);
+      setCouponCode(data.code);
+      toast.success(`Coupon ${data.code} applied! You save ₹${Math.round(d)}`);
     } catch (err: any) {
       toast.error('Invalid or expired coupon');
     }
@@ -157,7 +180,8 @@ export default function CheckoutPage() {
       p_payment_ref:      paymentRef ?? null,
       p_subtotal:         subtotal,
       p_discount:         discount,
-      p_shipping:         shipping,
+      p_shipping:         shipping + codHandling,
+      p_cod_fee:          codHandling,
       p_tax:              tax,
       p_total:            total,
       p_coupon_id:        couponApplied?.id ?? null,
@@ -194,11 +218,11 @@ export default function CheckoutPage() {
           name:          item.product.name,
           sku:           item.product.sku || 'SKU-001',
           units:         item.quantity,
-          selling_price: item.product.price,
+          selling_price: Math.round(total / Math.max(1, items.reduce((s, it) => s + it.quantity, 0))),
           discount: '', tax: '', hsn: '',
         })),
         payment_method: 'COD',
-        sub_total: subtotal,
+        sub_total: total,
         length: 10, breadth: 10, height: 10, weight: 0.5,
       };
       const res    = await fetch('/api/shiprocket', {
@@ -349,11 +373,23 @@ export default function CheckoutPage() {
         <div className="space-y-4">
           <div className="rounded-2xl border border-border bg-card p-4 sm:p-6 space-y-3">
             {[
-              { id: 'phonepe' as PayMethod, icon: CreditCard, label: 'Pay Online', sub: 'UPI, Cards, Net Banking via PhonePe' },
-              { id: 'cod'     as PayMethod, icon: Truck,       label: 'Cash on Delivery', sub: 'Pay when your order arrives' },
-            ].map(({ id, icon: Icon, label, sub }) => (
+              {
+                id: 'phonepe' as PayMethod,
+                icon: CreditCard,
+                label: 'Pay Online (Save ₹199 COD Fee)',
+                sub: 'UPI, Google Pay, PhonePe, Cards, NetBanking • Express Shipping ₹199',
+                badge: 'Recommended',
+              },
+              {
+                id: 'cod' as PayMethod,
+                icon: Truck,
+                label: 'Cash on Delivery (COD)',
+                sub: 'Pay when your order arrives • ₹199 Shipping + ₹199 Handling Charges',
+                badge: null,
+              },
+            ].map(({ id, icon: Icon, label, sub, badge }) => (
               <label key={id} className={`flex items-center gap-3 p-3.5 sm:p-4 rounded-xl border cursor-pointer transition-all ${
-                payMethod === id ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'
+                payMethod === id ? 'border-primary bg-primary/5 shadow-xs' : 'border-border hover:border-primary/40'
               }`}>
                 <input type="radio" name="pay" value={id} checked={payMethod === id} onChange={() => setPayMethod(id)} className="sr-only" />
                 <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
@@ -362,7 +398,17 @@ export default function CheckoutPage() {
                   {payMethod === id && <div className="h-2.5 w-2.5 rounded-full bg-primary" />}
                 </div>
                 <Icon className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                <div className="min-w-0"><p className="text-sm font-semibold text-foreground">{label}</p><p className="text-xs text-muted-foreground">{sub}</p></div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold text-foreground">{label}</p>
+                    {badge && (
+                      <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                        {badge}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>
+                </div>
               </label>
             ))}
           </div>
@@ -377,12 +423,31 @@ export default function CheckoutPage() {
                 <button onClick={() => setCouponApplied(null)} className="text-green-600 hover:text-green-800 shrink-0"><X className="h-4 w-4" /></button>
               </div>
             ) : (
-              <div className="flex gap-2">
-                <input className={`${inputCls} min-w-0 flex-1`} value={couponCode} onChange={e => setCouponCode(e.target.value.toUpperCase())} placeholder="ENTER CODE" />
-                <button onClick={applyCoupon} disabled={applyingCoupon}
-                  className="shrink-0 rounded-xl bg-secondary border border-border px-4 py-2.5 text-sm font-semibold text-foreground hover:bg-accent disabled:opacity-50">
-                  {applyingCoupon ? '…' : 'Apply'}
-                </button>
+              <div className="space-y-2.5">
+                <div className="flex gap-2">
+                  <input className={`${inputCls} min-w-0 flex-1`} value={couponCode} onChange={e => setCouponCode(e.target.value.toUpperCase())} placeholder="ENTER CODE (e.g. SAVE75)" />
+                  <button onClick={() => applyCoupon()} disabled={applyingCoupon}
+                    className="shrink-0 rounded-xl bg-secondary border border-border px-4 py-2.5 text-sm font-semibold text-foreground hover:bg-accent disabled:opacity-50">
+                    {applyingCoupon ? '…' : 'Apply'}
+                  </button>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap pt-1">
+                  <span className="text-[11px] font-bold text-muted-foreground">Available Coupons:</span>
+                  <button
+                    type="button"
+                    onClick={() => applyCoupon('SAVE75')}
+                    className="text-[11px] font-mono font-bold px-2.5 py-1 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 transition-colors"
+                  >
+                    SAVE75 (₹75 off on 1+ unit)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyCoupon('COMBO200')}
+                    className="text-[11px] font-mono font-bold px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 transition-colors"
+                  >
+                    COMBO200 (₹200 off on 2+ units)
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -391,21 +456,22 @@ export default function CheckoutPage() {
           <div className="rounded-2xl border border-border bg-card p-4 sm:p-5 space-y-3">
             <p className="text-sm font-bold text-foreground">Order Summary</p>
             {[
-              { label: 'Subtotal', val: subtotal },
-              ...(discount > 0 ? [{ label: 'Discount', val: -discount }] : []),
-              { label: 'Shipping', val: shipping },
+              { label: 'Subtotal (Base Price)', val: subtotal },
               { label: 'GST (18%)', val: tax },
+              { label: 'Express Shipping', val: shipping },
+              ...(codHandling > 0 ? [{ label: 'COD Handling Charges', val: codHandling }] : []),
+              ...(discount > 0 ? [{ label: `Discount (${couponApplied?.code})`, val: -discount }] : []),
             ].map(({ label, val }) => (
               <div key={label} className="flex justify-between text-sm">
                 <span className="text-muted-foreground">{label}</span>
-                <span className={`font-semibold ${val < 0 ? 'text-green-600' : 'text-foreground'}`}>
+                <span className={`font-semibold ${val < 0 ? 'text-green-600 font-bold' : 'text-foreground'}`}>
                   {val < 0 ? '-' : ''}₹{Math.abs(val).toLocaleString('en-IN')}
                 </span>
               </div>
             ))}
             <div className="flex justify-between text-base font-black border-t border-border pt-2">
-              <span>Total</span>
-              <span>₹{total.toLocaleString('en-IN')}</span>
+              <span>Total Payable</span>
+              <span className="text-amber-600">₹{total.toLocaleString('en-IN')}</span>
             </div>
           </div>
 
@@ -413,7 +479,7 @@ export default function CheckoutPage() {
             onClick={payMethod === 'cod' ? placeCOD : placePhonePe}
             disabled={placing}
             className="w-full rounded-full bg-[#ffd814] hover:bg-[#f7ca00] py-3.5 text-sm font-bold text-zinc-900 border border-[#fcd200] shadow-sm hover:shadow transition-all disabled:opacity-50 flex items-center justify-center gap-2">
-            {placing ? '…' : payMethod === 'cod' ? '✓ Place Order (COD)' : '🔒 Pay ₹' + total.toLocaleString('en-IN') + ' via PhonePe'}
+            {placing ? '…' : payMethod === 'cod' ? `✓ Place Order (COD) — Pay ₹${total.toLocaleString('en-IN')} on Delivery` : `🔒 Pay ₹${total.toLocaleString('en-IN')} via PhonePe`}
           </button>
 
           <div className="flex flex-col items-center gap-1 text-[11px] text-muted-foreground pt-1 text-center">

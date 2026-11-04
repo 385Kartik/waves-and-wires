@@ -96,6 +96,11 @@ export default function Footer() {
                     Help Center
                   </Link>
                 </li>
+                <li>
+                  <Link to="/blog" className="hover:text-[#d97706] transition-colors">
+                    Blogs
+                  </Link>
+                </li>
               </ul>
             </div>
 
@@ -135,12 +140,12 @@ export default function Footer() {
                 </li>
                 <li className="text-[11px] sm:text-xs text-[#64748b]">
                   <a
-                    href="https://wa.me/916009595600"
+                    href="https://wa.me/91600 9595 600"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="hover:text-[#15803d] transition-colors inline-flex items-center gap-1 text-[#16a34a] font-medium"
                   >
-                    <span>WhatsApp: +91 60095 95600</span>
+                    <span>WhatsApp: +91 600 9595 600</span>
                   </a>
                 </li>
               </ul>

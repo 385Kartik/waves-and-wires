@@ -157,17 +157,21 @@ export default function CartDrawer() {
             {/* Totals */}
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="text-stone-500">Subtotal</span>
+                <span className="text-stone-500">Subtotal (Base)</span>
                 <span className="font-bold text-stone-900">₹{subtotal.toLocaleString('en-IN')}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-stone-500">Shipping</span>
+                <span className="text-stone-500">GST (18%)</span>
+                <span className="font-bold text-stone-900">₹{Math.round(subtotal * 0.18).toLocaleString('en-IN')}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-stone-500">Express Shipping</span>
                 <span className="font-bold text-stone-900">₹{shipping}</span>
               </div>
               <div className="flex justify-between items-center pt-2 border-t border-stone-100">
                 <span className="font-black text-stone-900">Total</span>
                 <span className="text-lg font-black text-amber-500">
-                  ₹{(subtotal + shipping).toLocaleString('en-IN')}
+                  ₹{(subtotal + Math.round(subtotal * 0.18) + shipping).toLocaleString('en-IN')}
                 </span>
               </div>
             </div>
