@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, memo } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import {
   Search, Package, Truck, CheckCircle, Clock,
-  ShoppingBag, XCircle, RefreshCw, AlertTriangle,
+  ShoppingBag, XCircle, RefreshCw, AlertTriangle, FileText, Receipt,
 } from 'lucide-react';
 import { useAuth }   from '@/contexts/AuthContext';
 import { toast }     from 'sonner';
@@ -30,6 +30,10 @@ interface Order {
   courier_name?:           string | null;
   shiprocket_order_id?:    string | null;
   shiprocket_shipment_id?: string | null;
+  invoice_id?:             string | null;
+  invoice_number?:         string | null;
+  credit_note_id?:         string | null;
+  credit_note_number?:     string | null;
   user_id?: string;
 }
 
@@ -216,6 +220,33 @@ const OrderCard = memo(function OrderCard({ o, user, onCancelClick, onRefundClic
         </p>
       )}
 
+      {/* Tax Invoice and Credit Note actions */}
+      <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border/60">
+        <a
+          href={`/api/invoices/order/${o.order_number}/view`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 rounded-xl border border-border bg-secondary/80 px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary hover:border-primary/40 transition-all shadow-sm"
+          title="View & Download Official GST Tax Invoice"
+        >
+          <FileText className="h-3.5 w-3.5 text-amber-500" />
+          Tax Invoice
+        </a>
+
+        {o.status === 'cancelled' && (
+          <a
+            href={`/api/credit-notes/order/${o.order_number}/view`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50/90 px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-100 transition-all shadow-sm"
+            title="View & Download GST Credit Note"
+          >
+            <Receipt className="h-3.5 w-3.5 text-red-600" />
+            Credit Note
+          </a>
+        )}
+      </div>
+
       {/* Action buttons */}
       {user && (
         <div className="flex flex-wrap gap-2">
@@ -342,7 +373,8 @@ export default function OrderTrackingPage() {
       throw new Error(`Order cannot be cancelled. Current status: "${freshOrder.status}".`);
  
     // ── 2. Cancel in DB ──────────────────────────────────────────────────────
-    await orderService.updateOrder(o.id, { status: 'cancelled', updated_at: new Date().toISOString() });
+    // ── 2. Cancel in DB, issue GST Credit Note & initiate refund ──────────
+    await apiClient.post(`/orders/${o.id}/cancel`, { cancellation_reason: reason });
  
     // ── 3. Cancel in Shiprocket ──────────────────────────────────────────────
     if (o.shiprocket_order_id) {
@@ -374,8 +406,8 @@ export default function OrderTrackingPage() {
     // ── 5. UI cleanup ─────────────────────────────────────────────────────────
     toast.success(
       isOnline
-        ? 'Order cancelled. Refund will be processed within 5–7 business days.'
-        : 'Order cancelled successfully.',
+        ? 'Order cancelled. Tax Credit Note generated & refund initiated (5–7 business days).'
+        : 'Order cancelled. Tax Credit Note generated to void invoice.',
     );
     setCancelModal(null); setCancelReason(''); setCancelOther('');
     await loadMyOrders();
@@ -669,7 +701,16 @@ export default function OrderTrackingPage() {
               )}
             </div>
 
-            {cancelModal.payment_method === 'razorpay' && cancelModal.payment_status === 'paid' && (
+            {((cancelModal.payment_method === 'phonepe' || cancelModal.payment_method === 'razorpay' || cancelModal.payment_method === 'online') && cancelModal.payment_status === 'paid') ? (
+              <div className="rounded-xl bg-blue-50 border border-blue-200 p-3 text-xs text-blue-700">
+                💳 <strong>Online Paid:</strong> A <strong>GST Credit Note</strong> will be generated & refund of <strong>{INR(cancelModal.total)}</strong> initiated within 5–7 business days.
+              </div>
+            ) : (
+              <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800">
+                📦 <strong>Cash on Delivery:</strong> A <strong>GST Credit Note</strong> will be generated to legally void the order invoice.
+              </div>
+            )}
+            {false && (
               <div className="rounded-xl bg-blue-50 border border-blue-200 p-3 text-xs text-blue-700">
                 💳 Since you paid online, your refund of <strong>{INR(cancelModal.total)}</strong> will be processed within 5–7 business days.
               </div>

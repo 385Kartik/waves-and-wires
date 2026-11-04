@@ -354,21 +354,48 @@ export default function AccountPage() {
           ) : (
             <div className="space-y-3">
               {orders.map(o => (
-                <Link key={o.id} to={`/order-tracking?order=${o.order_number}`}
-                  className="flex items-center justify-between p-3 rounded-xl bg-secondary/50 border border-border hover:bg-secondary hover:border-primary/20 transition-all">
-                  <div>
-                    <p className="text-xs font-bold text-foreground">#{o.order_number}</p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">{format(new Date(o.created_at), 'dd MMM yyyy')}</p>
-                    <p className="text-[10px] text-muted-foreground">{o.order_items?.length ?? 0} item{o.order_items?.length !== 1 ? 's' : ''}</p>
+                <div key={o.id}
+                  className="p-3.5 rounded-xl bg-secondary/50 border border-border hover:border-primary/20 transition-all space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Link to={`/order-tracking?order=${o.order_number}`} className="text-xs font-bold text-foreground hover:text-primary transition-colors">
+                        #{o.order_number}
+                      </Link>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">{format(new Date(o.created_at), 'dd MMM yyyy')}</p>
+                      <p className="text-[10px] text-muted-foreground">{o.order_items?.length ?? 0} item{o.order_items?.length !== 1 ? 's' : ''}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-bold text-foreground">{INR(o.total)}</p>
+                      <span className={`text-[10px] font-bold capitalize px-2 py-0.5 rounded-full ${
+                        o.status === 'delivered' ? 'bg-green-100 text-green-700' :
+                        o.status === 'cancelled' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
+                      }`}>{o.status}</span>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-bold text-foreground">{INR(o.total)}</p>
-                    <span className={`text-[10px] font-bold capitalize px-2 py-0.5 rounded-full ${
-                      o.status === 'delivered' ? 'bg-green-100 text-green-700' :
-                      o.status === 'cancelled' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
-                    }`}>{o.status}</span>
+                  <div className="flex items-center gap-2 pt-2 border-t border-border/50 text-[11px]">
+                    <a
+                      href={`/api/invoices/order/${o.order_number}/view`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-semibold text-primary hover:underline flex items-center gap-1 bg-primary/10 px-2 py-0.5 rounded-md"
+                    >
+                      📄 Tax Invoice
+                    </a>
+                    {o.status === 'cancelled' && (
+                      <a
+                        href={`/api/credit-notes/order/${o.order_number}/view`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-semibold text-red-600 hover:underline flex items-center gap-1 bg-red-50 px-2 py-0.5 rounded-md border border-red-200"
+                      >
+                        📑 Credit Note
+                      </a>
+                    )}
+                    <Link to={`/order-tracking?order=${o.order_number}`} className="ml-auto text-xs font-medium text-muted-foreground hover:text-foreground">
+                      Track Order →
+                    </Link>
                   </div>
-                </Link>
+                </div>
               ))}
             </div>
           )}
