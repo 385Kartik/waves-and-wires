@@ -252,7 +252,7 @@ export default function WhatsAppButton() {
                         : 'border-stone-200 bg-white text-stone-600'
                     }`}
                   >
-                    1 Unit (₹2,550)
+                    1 Unit (₹2,300)
                   </button>
                   <button
                     type="button"

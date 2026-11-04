@@ -51,7 +51,7 @@ export default function Header() {
             className="group relative inline-flex items-center border-2 border-[#eab308] bg-[#fffdf7] hover:bg-[#1a1714] text-[#1a1714] hover:text-[#facc15] px-2.5 xs:px-3 sm:px-6 py-1.5 sm:py-2.5 text-[9px] xs:text-[10px] sm:text-[11px] font-extrabold uppercase tracking-[0.08em] xs:tracking-[0.14em] sm:tracking-[0.18em] transition-all shadow-xs hover:shadow-md whitespace-nowrap"
           >
             <span>PURCHASE</span>
-            <span className="ml-1 xs:ml-1.5 sm:ml-2 text-[#d97706] group-hover:text-[#facc15] font-black text-[9px] xs:text-[10px] sm:text-[11px]">₹2,550</span>
+            <span className="ml-1 xs:ml-1.5 sm:ml-2 text-[#d97706] group-hover:text-[#facc15] font-black text-[9px] xs:text-[10px] sm:text-[11px]">₹2,300</span>
             {/* Folded corner triangle decoration in bright gold yellow */}
             <span className="absolute bottom-0 right-0 w-2 h-2 sm:w-2.5 sm:h-2.5 bg-[#eab308] [clip-path:polygon(100%_0,0_100%,100%_100%)]" />
           </button>
