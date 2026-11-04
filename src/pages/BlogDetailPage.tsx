@@ -163,32 +163,42 @@ export default function BlogDetailPage() {
           )}
 
           <div className="flex items-center gap-3 pt-4 border-t border-stone-200/80 mt-6">
-            <div className="h-10 w-10 rounded-full bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center text-stone-950 font-black text-xs shadow-sm">
-              W&W
+            <div className="h-11 w-11 rounded-2xl bg-white border border-stone-200 p-1 flex items-center justify-center shrink-0 shadow-2xs">
+              <img src="/logo.png" alt="Waves & Wires" className="h-full w-full object-contain" />
             </div>
             <div>
-              <p className="text-xs font-black text-stone-900">{blog.author || 'Waves & Wires Editorial'}</p>
-              <p className="text-[11px] text-stone-500">Official Kitchen Appliance & Culinary Guide</p>
+              <p className="text-xs font-black text-stone-900 flex items-center gap-1.5">
+                <span>{blog.author || 'Waves & Wires Editorial'}</span>
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold">
+                  Verified Brand
+                </span>
+              </p>
+              <p className="text-[11px] text-stone-500">Official Kitchen Appliance &amp; Culinary Research Team</p>
             </div>
           </div>
         </div>
 
-        {/* Featured Image */}
+        {/* Featured Image with Waves & Wires Verified Brand Watermark */}
         {blog.image_url && (
-          <div className="rounded-2xl sm:rounded-3xl overflow-hidden mb-10 shadow-lg shadow-amber-900/5 border border-stone-200/80 bg-stone-100">
+          <div className="relative rounded-2xl sm:rounded-3xl overflow-hidden mb-10 shadow-lg shadow-amber-900/5 border border-stone-200/80 bg-stone-100 group">
             <img
               src={blog.image_url}
               alt={blog.image_alt || blog.title}
-              className="w-full h-auto max-h-[500px] object-cover"
+              className="w-full h-auto max-h-[520px] object-cover"
               loading="eager"
             />
+            {/* Waves & Wires Verified Logo Badge */}
+            <div className="absolute top-4 left-4 flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/95 backdrop-blur-md border border-stone-200/80 shadow-md">
+              <img src="/logo.png" alt="Waves & Wires" className="h-4 w-auto object-contain" />
+              <span className="text-[10px] font-black uppercase tracking-wider text-stone-900">Waves &amp; Wires Official</span>
+            </div>
           </div>
         )}
 
         {/* Main Article Body */}
         <div className="bg-white rounded-2xl sm:rounded-3xl p-6 sm:p-10 lg:p-12 shadow-sm border border-stone-200/70 mb-10">
           <div
-            className="prose prose-stone prose-headings:font-black prose-headings:tracking-tight prose-headings:text-stone-950 prose-p:text-stone-700 prose-p:leading-relaxed prose-a:text-amber-600 prose-a:underline hover:prose-a:text-amber-700 prose-li:text-stone-700 prose-strong:text-stone-900 max-w-none text-base sm:text-lg"
+            className="article-rich-content prose prose-stone prose-headings:font-black prose-headings:tracking-tight prose-headings:text-stone-950 prose-p:text-stone-700 prose-p:leading-relaxed prose-a:text-amber-600 prose-a:underline hover:prose-a:text-amber-700 prose-li:text-stone-700 prose-strong:text-stone-900 max-w-none text-base sm:text-lg"
             dangerouslySetInnerHTML={{ __html: blog.content }}
           />
 
